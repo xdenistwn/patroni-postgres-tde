@@ -1,0 +1,171 @@
+services:
+  # etcd cluster - 3 nodes for high availability
+  etcd1:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: etcd1
+    hostname: etcd1
+    environment:
+      - ETCD_NAME=etcd1
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd1:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd1:2379
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-token
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    networks:
+      - pg-network
+    volumes:
+      - etcd1-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etcd2:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: etcd2
+    hostname: etcd2
+    environment:
+      - ETCD_NAME=etcd2
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd2:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd2:2379
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-token
+    ports:
+      - "2479:2379"
+      - "2480:2380"
+    networks:
+      - pg-network
+    volumes:
+      - etcd2-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etcd3:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: etcd3
+    hostname: etcd3
+    environment:
+      - ETCD_NAME=etcd3
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd3:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd3:2379
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-token
+    ports:
+      - "2579:2379"
+      - "2580:2380"
+    networks:
+      - pg-network
+    volumes:
+      - etcd3-data:/etcd-data
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Master node with Patroni
+  postgres-one:
+    image: postgres_patroni:latest
+    container_name: postgres-one
+    hostname: postgres-one
+    environment:
+      - PATRONI_NAME=postgres-one
+      - PATRONI_SCOPE=postgres-cluster
+      - PATRONI_NAMESPACE=/db/
+      - PATRONI_ETCD3_HOSTS=etcd1:2379,etcd2:2379,etcd3:2379
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=postgres-one:8008
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=postgres-one:5432
+      - PATRONI_POSTGRESQL_DATA_DIR=/data/db
+      - PATRONI_REPLICATION_USERNAME=replicator
+      - PATRONI_REPLICATION_PASSWORD=repl_password_secure
+      - PATRONI_SUPERUSER_USERNAME=postgres
+      - PATRONI_SUPERUSER_PASSWORD=postgres_password_secure
+      # pg_tde configuration
+      - ENABLE_PG_TDE=1
+      - PG_TDE_KEY_PROVIDER=file
+    ports:
+      - "5432:5432"
+      - "8008:8008"
+    networks:
+      - pg-network
+    volumes:
+      - postgres-one-data:/data/db
+      - ./config/patroni/patroni-one.yml:/etc/patroni/patroni.yml
+      - pg-tde-keys:/data/pg_tde_keys
+    depends_on:
+      etcd1:
+        condition: service_healthy
+      etcd2:
+        condition: service_healthy
+      etcd3:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Replica node with Patroni
+  postgres-two:
+    image: postgres_patroni:latest
+    container_name: postgres-two
+    hostname: postgres-two
+    environment:
+      - PATRONI_NAME=postgres-two
+      - PATRONI_SCOPE=postgres-cluster
+      - PATRONI_NAMESPACE=/db/
+      - PATRONI_ETCD3_HOSTS=etcd1:2379,etcd2:2379,etcd3:2379
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=postgres-two:8008
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=postgres-two:5432
+      - PATRONI_POSTGRESQL_DATA_DIR=/data/db
+      - PATRONI_REPLICATION_USERNAME=replicator
+      - PATRONI_REPLICATION_PASSWORD=repl_password_secure
+      - PATRONI_SUPERUSER_USERNAME=postgres
+      - PATRONI_SUPERUSER_PASSWORD=postgres_password_secure
+      # pg_tde configuration
+      - ENABLE_PG_TDE=1
+      - PG_TDE_KEY_PROVIDER=file
+    ports:
+      - "5433:5432"
+      - "8009:8008"
+    networks:
+      - pg-network
+    volumes:
+      - postgres-two-data:/data/db
+      - ./config/patroni/patroni-two.yml:/etc/patroni/patroni.yml
+      - pg-tde-keys:/data/pg_tde_keys
+    depends_on:
+      postgres-one:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  pg-network:
+    driver: bridge
+
+volumes:
+  etcd1-data:
+  etcd2-data:
+  etcd3-data:
+  postgres-one-data:
+  postgres-two-data:
+  pg-tde-keys:

@@ -1,0 +1,20 @@
+#
+#--------------------------------------------------------------------------
+# docker-compose.build.yml
+#--------------------------------------------------------------------------
+#
+# Here is where you can register your build dockerfile.
+# For sample I just set this file to basic php-fpm config. 
+# feel free to modify it base on your need.
+# 
+# notes:
+# Do not use this compose build file to run the container.
+# Instead please use docker-compose.yml file to run the web server.
+#
+
+services:
+  postgres:
+    image: postgres_patroni:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres

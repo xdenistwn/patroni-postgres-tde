@@ -1,0 +1,35 @@
+FROM percona/percona-distribution-postgresql:18.1
+
+USER root
+
+# Install required packages using dnf
+# We use 'dnf clean all' to keep the image slim
+RUN dnf install -y \
+    python3-pip \
+    python3-devel \
+    wget \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# Install Patroni
+# Note: Oracle Linux python3-pip might not need --break-system-packages 
+# but it's safer to include if you encounter PEP 668 restrictions.
+RUN pip3 install patroni[etcd3]
+
+# Create necessary directories
+RUN mkdir -p /etc/patroni /data/pg_tde_keys && \
+    chown -R postgres:postgres /etc/patroni /data/pg_tde_keys && \
+    chmod 700 /data/pg_tde_keys && \
+    chmod 750 /data/db
+
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+USER postgres
+
+# Expose PostgreSQL and Patroni ports
+EXPOSE 5432 8008
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["patroni", "/etc/patroni/patroni.yml"]
