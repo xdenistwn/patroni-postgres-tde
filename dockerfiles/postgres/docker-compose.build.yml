@@ -11,6 +11,7 @@
 # Do not use this compose build file to run the container.
 # Instead please use docker-compose.yml file to run the web server.
 #
+#
 
 services:
   postgres:

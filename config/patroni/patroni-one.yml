@@ -51,10 +51,11 @@ bootstrap:
         log_rotation_age: 1d
         log_rotation_size: 100MB
         log_line_prefix: "%m [%p] %u@%d "
-        log_timezone: "UTC"
+        log_timezone: "Asia/Jakarta"
         
         # pg_tde extension
         shared_preload_libraries: "pg_tde"
+        pg_tde.wal_encrypt: "off"
         
         # Archive mode (disabled for now, enable with pgBackRest)
         archive_mode: "off"
@@ -69,13 +70,6 @@ bootstrap:
     - host all all 0.0.0.0/0 md5
     - host all all ::0/0 md5
 
-  users:
-    admin:
-      password: admin_password_secure
-      options:
-        - createrole
-        - createdb
-
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: postgres-one:5432
@@ -85,21 +79,23 @@ postgresql:
   
   authentication:
     replication:
-      username: replicator
-      password: repl_password_secure
+      username: ${PATRONI_REPLICATION_USERNAME}
+      password: ${PATRONI_REPLICATION_PASSWORD}
     superuser:
-      username: postgres
-      password: postgres_password_secure
+      username: ${PATRONI_SUPERUSER_USERNAME}
+      password: ${PATRONI_SUPERUSER_PASSWORD}
       
   parameters:
     unix_socket_directories: "/var/run/postgresql"
+    recovery_min_apply_delay: "30s"
     
   create_replica_methods:
-    - basebackup
+    - tde_basebackup
     
-  basebackup:
-    max-rate: 100M
+  tde_basebackup:
+    command: "/usr/local/bin/patroni-tde-basebackup.sh"
     checkpoint: fast
+    max-rate: 100M
 
 tags:
   nofailover: false

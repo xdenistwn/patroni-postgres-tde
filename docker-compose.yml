@@ -78,6 +78,44 @@ services:
       timeout: 5s
       retries: 5
 
+  # HashiCorp Vault for Key Management
+  vault:
+    image: hashicorp/vault:1.15
+    container_name: vault
+    hostname: vault
+    environment:
+      - VAULT_DEV_ROOT_TOKEN_ID=${VAULT_TOKEN}
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+      - VAULT_ADDR=${VAULT_ADDR:-"http://vault:8200"}
+    ports:
+      - "8200:8200"
+    networks:
+      - pg-network
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Vault Initialization Service
+  vault-init:
+    image: hashicorp/vault:1.15
+    container_name: vault-init
+    volumes:
+      - ./scripts:/scripts
+      - ./storage/vault/secrets:/vault/secrets
+    environment:
+      - VAULT_ADDR=${VAULT_ADDR:-"http://vault:8200"}
+      - VAULT_ROOT_DEV_TOKEN=${VAULT_TOKEN}
+    depends_on:
+      vault:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/vault-init.sh"]
+    networks:
+      - pg-network
+
   # PostgreSQL Master node with Patroni
   postgres-one:
     image: postgres_patroni:latest
@@ -91,13 +129,13 @@ services:
       - PATRONI_RESTAPI_CONNECT_ADDRESS=postgres-one:8008
       - PATRONI_POSTGRESQL_CONNECT_ADDRESS=postgres-one:5432
       - PATRONI_POSTGRESQL_DATA_DIR=/data/db
-      - PATRONI_REPLICATION_USERNAME=replicator
-      - PATRONI_REPLICATION_PASSWORD=repl_password_secure
-      - PATRONI_SUPERUSER_USERNAME=postgres
-      - PATRONI_SUPERUSER_PASSWORD=postgres_password_secure
+      - PATRONI_REPLICATION_USERNAME=${PATRONI_PG_REPLICATION_USERNAME}
+      - PATRONI_REPLICATION_PASSWORD=${PATRONI_PG_REPLICATION_PASSWORD}
+      - PATRONI_SUPERUSER_USERNAME=${PATRONI_PG_SUPERUSER}
+      - PATRONI_SUPERUSER_PASSWORD=${PATRONI_PG_PASSWORD}
       # pg_tde configuration
       - ENABLE_PG_TDE=1
-      - PG_TDE_KEY_PROVIDER=file
+      - PG_TDE_KEY_PROVIDER=vault
     ports:
       - "5432:5432"
       - "8008:8008"
@@ -106,7 +144,7 @@ services:
     volumes:
       - postgres-one-data:/data/db
       - ./config/patroni/patroni-one.yml:/etc/patroni/patroni.yml
-      - pg-tde-keys:/data/pg_tde_keys
+      - ./storage/vault/secrets:/etc/postgresql/secrets:ro
     depends_on:
       etcd1:
         condition: service_healthy
@@ -114,11 +152,39 @@ services:
         condition: service_healthy
       etcd3:
         condition: service_healthy
+      vault:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # pg_tde Initialization Service
+  pg-tde-init:
+    image: postgres_patroni:latest
+    container_name: pg-tde-init
+    volumes:
+      - ./scripts/pg-tde-init.sh:/scripts/pg-tde-init.sh:ro
+      - ./storage/vault/secrets:/etc/postgresql/secrets:ro
+    environment:
+      - PATRONI_PG_SUPERUSER=${PATRONI_PG_SUPERUSER}
+      - PATRONI_PG_PASSWORD=${PATRONI_PG_PASSWORD}
+      - DB_USER_NAME=${DB_USER}
+      - DB_USER_PASSWORD=${DB_PASSWORD}
+      - DB_DEV_USER_NAME=${DB_DEV_USER}
+      - DB_DEV_USER_PASSWORD=${DB_DEV_PASSWORD}
+      - VAULT_MOUNT_PATH=${VAULT_MOUNT_PATH}
+    depends_on:
+      postgres-one:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh", "/scripts/pg-tde-init.sh"]
+    networks:
+      - pg-network
 
   # PostgreSQL Replica node with Patroni
   postgres-two:
@@ -133,13 +199,13 @@ services:
       - PATRONI_RESTAPI_CONNECT_ADDRESS=postgres-two:8008
       - PATRONI_POSTGRESQL_CONNECT_ADDRESS=postgres-two:5432
       - PATRONI_POSTGRESQL_DATA_DIR=/data/db
-      - PATRONI_REPLICATION_USERNAME=replicator
-      - PATRONI_REPLICATION_PASSWORD=repl_password_secure
-      - PATRONI_SUPERUSER_USERNAME=postgres
-      - PATRONI_SUPERUSER_PASSWORD=postgres_password_secure
+      - PATRONI_REPLICATION_USERNAME=${PATRONI_PG_REPLICATION_USERNAME}
+      - PATRONI_REPLICATION_PASSWORD=${PATRONI_PG_REPLICATION_PASSWORD}
+      - PATRONI_SUPERUSER_USERNAME=${PATRONI_PG_SUPERUSER}
+      - PATRONI_SUPERUSER_PASSWORD=${PATRONI_PG_PASSWORD}
       # pg_tde configuration
       - ENABLE_PG_TDE=1
-      - PG_TDE_KEY_PROVIDER=file
+      - PG_TDE_KEY_PROVIDER=vault
     ports:
       - "5433:5432"
       - "8009:8008"
@@ -148,9 +214,17 @@ services:
     volumes:
       - postgres-two-data:/data/db
       - ./config/patroni/patroni-two.yml:/etc/patroni/patroni.yml
-      - pg-tde-keys:/data/pg_tde_keys
+      - ./storage/vault/secrets:/etc/postgresql/secrets:ro
     depends_on:
-      postgres-one:
+      pg-tde-init:
+        condition: service_completed_successfully
+      etcd1:
+        condition: service_healthy
+      etcd2:
+        condition: service_healthy
+      etcd3:
+        condition: service_healthy
+      vault:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
@@ -168,4 +242,4 @@ volumes:
   etcd3-data:
   postgres-one-data:
   postgres-two-data:
-  pg-tde-keys:
+  vault-data:
