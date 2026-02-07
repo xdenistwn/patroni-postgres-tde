@@ -2,7 +2,7 @@
 set -e
 
 # Rename vault token
-mv storage/vault/secrets/vault_token.example.txt storage/vault/secrets/vault_token.txt
+cp storage/vault/secrets/vault_token.example.txt storage/vault/secrets/vault_token.txt
 
 echo "Starting Postgres Patroni cluster with HashiCorp Vault..."
 docker-compose up

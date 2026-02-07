@@ -23,5 +23,9 @@ for VOL in $VOLUMES; do
     echo "Done."
 done
 
+echo "Removing vault_token.txt..."
+echo "--------------------------"
+rm storage/vault/secrets/vault_token.txt
+
 echo "--------------------------"
 echo "Cleanup complete!"
