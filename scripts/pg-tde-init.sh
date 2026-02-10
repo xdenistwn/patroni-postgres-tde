@@ -21,11 +21,11 @@ echo "Waiting for Patroni cluster to have a leader..."
 while true; do
   LEADER_INFO=$(curl -s http://postgres-one:8008/cluster)
   if [ $? -eq 0 ] && [ -n "$LEADER_INFO" ]; then
-    LEADER=$(echo "$LEADER_INFO" | jq -r '.members[]? | select(.role=="leader") | .name' 2>/dev/null)
-    if [ -n "$LEADER" ] && [ "$LEADER" != "null" ]; then
-      echo "Found leader: $LEADER"
-      break
-    fi
+  LEADER=$(echo "$LEADER_INFO" | jq -r '.members[]? | select(.role=="leader") | .name' 2>/dev/null)
+  if [ -n "$LEADER" ] && [ "$LEADER" != "null" ]; then
+  echo "Found leader: $LEADER"
+  break
+  fi
   fi
   echo "Waiting for leader..."
   sleep 2
@@ -41,7 +41,7 @@ run_sql() {
   psql -h "$TARGET_HOST" -U "$DB_USER" -d "$DB_NAME" -t -c "$1"
 }
 
-# --- 1. PG_TDE SETUP ---
+# --- 1. Encryption TDE SETUP ---
 echo "--- Setting up PG_TDE ---"
 echo "Creating extension pg_tde..."
 run_sql "CREATE EXTENSION IF NOT EXISTS pg_tde;"
@@ -69,35 +69,9 @@ else
   echo "Default principal key is already configured."
 fi
 
-# --- 2. USER CREATION ---
-echo "--- Setting up Application Users ---"
-
-# Create DBA User (snowball)
-echo "Creating DBA user: $APP_DBA_USER..."
-run_sql "DO \$\$
-BEGIN
-    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$APP_DBA_USER') THEN
-        CREATE ROLE $APP_DBA_USER WITH LOGIN PASSWORD '$APP_DBA_PASS' CREATEDB CREATEROLE;
-    END IF;
-END
-\$\$;"
-
-# Create DEV User (snowball_dev)
-echo "Creating Read-Only user: $APP_DEV_USER..."
-run_sql "DO \$\$
-BEGIN
-    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = '$APP_DEV_USER') THEN
-        CREATE ROLE $APP_DEV_USER WITH LOGIN PASSWORD '$APP_DEV_PASS';
-    END IF;
-END
-\$\$;"
-
-# Grant Read-Only Permissions
-echo "Granting read-only permissions to $APP_DEV_USER..."
-run_sql "GRANT USAGE ON SCHEMA public TO $APP_DEV_USER;"
-run_sql "GRANT SELECT ON ALL TABLES IN SCHEMA public TO $APP_DEV_USER;"
-run_sql "GRANT SELECT ON ALL SEQUENCES IN SCHEMA public TO $APP_DEV_USER;"
-run_sql "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO $APP_DEV_USER;"
-run_sql "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON SEQUENCES TO $APP_DEV_USER;"
+# --- 2. WAL ENCRYPTION SETUP ---
+echo "Enabling WAL encryption..."
+run_sql "ALTER SYSTEM SET pg_tde.wal_encrypt = on;"
+run_sql "SELECT pg_reload_conf();"
 
 echo "Cluster initialization complete on $LEADER."

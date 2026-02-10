@@ -30,10 +30,10 @@ if [ -f "$TOKEN_FILE" ]; then
       echo "Vault is already initialized and token is valid. Skipping initialization."
       exit 0
     fi
-    echo "Token valid but TDE engine missing (likely Vault restart). Re-initializing..."
-  else
-    echo "Existing token is invalid or expired. Re-initializing..."
-  fi
+      echo "Token valid but TDE engine missing (likely Vault restart). Re-initializing..."
+    else
+      echo "Existing token is invalid or expired. Re-initializing..."
+    fi
 fi
 
 # 1. Enable the kv v2 secret engine

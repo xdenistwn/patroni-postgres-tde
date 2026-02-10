@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-# Rename vault token
-cp storage/vault/secrets/vault_token.example.txt storage/vault/secrets/vault_token.txt
+# Copy and rename vault token
+yes | cp storage/vault/secrets/token.example.txt storage/vault/secrets/vault_token.txt
 
 echo "Starting Postgres Patroni cluster with HashiCorp Vault..."
-docker-compose up
+docker-compose up -d
 
 echo "Waiting for services to be healthy..."
 # Simple wait for simplicity, healthchecks in docker-compose are better

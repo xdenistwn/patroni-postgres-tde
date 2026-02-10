@@ -5,22 +5,22 @@ USER root
 # Install required packages using dnf
 # We use 'dnf clean all' to keep the image slim
 RUN dnf install -y \
-    python3-pip \
-    python3-devel \
-    wget \
-    jq \
-    && dnf clean all \
-    && rm -rf /var/cache/dnf
+  python3-pip \
+  python3-devel \
+  wget \
+  jq \
+  && dnf clean all \
+  && rm -rf /var/cache/dnf
 
 # Install Patroni
 RUN pip3 install patroni[etcd3]
 
 # Create necessary directories
 RUN mkdir -p /etc/patroni /data/db /data/pg_tde_keys && \
-    mkdir -p /etc/postgresql/secrets && touch /etc/postgresql/secrets/vault_token.txt && \
-    chown -R postgres:postgres /etc/patroni /data /etc/postgresql && \
-    chmod 700 /data/db /data/pg_tde_keys && \
-    chmod 600 /etc/postgresql/secrets/vault_token.txt
+  mkdir -p /etc/postgresql/secrets && touch /etc/postgresql/secrets/vault_token.txt && \
+  chown -R postgres:postgres /etc/patroni /data /etc/postgresql && \
+  chmod 700 /data/db /data/pg_tde_keys && \
+  chmod 600 /etc/postgresql/secrets/vault_token.txt
 
 # Copy entrypoint and helper scripts
 COPY entrypoint.postgres.sh /entrypoint.sh
