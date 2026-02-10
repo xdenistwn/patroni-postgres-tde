@@ -26,6 +26,7 @@ The architecture consists of:
 | PgBouncer layer implementation | - | - |
 | Archiving into Object Storage (S3, MinIO) | - | - |
 | Monitoring (Prometheus, Grafana) | - | - |
+| Apply SSL/TLS between services | - | - |
 
 ## Prerequisites
 - **Docker & Docker Compose**: v2.x or higher recommended.
