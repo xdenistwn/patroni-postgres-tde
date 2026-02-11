@@ -28,5 +28,19 @@ if [ -d "$DATA_DIR" ]; then
   fi
 fi
 
+# Start PgBouncer in the background after PostgreSQL is ready
+(
+  echo "Waiting for PostgreSQL to be ready before starting PgBouncer..."
+  for i in {1..30}; do
+    if pg_isready -h 127.0.0.1 -p 5432 > /dev/null 2>&1; then
+      echo "PostgreSQL is ready, starting PgBouncer on port 6432..."
+      pgbouncer -d /etc/pgbouncer/pgbouncer.ini
+      echo "PgBouncer started successfully"
+      break
+    fi
+    sleep 2
+  done
+) &
+
 # Start Patroni
 exec "$@"

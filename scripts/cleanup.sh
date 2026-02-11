@@ -3,7 +3,6 @@ set -e
 
 echo "Stopping containers..."
 docker-compose down --remove-orphans
-sleep 10
 
 # Get the list of volumes
 VOLUMES=$(docker volume ls -q | grep patroni || true)

@@ -138,12 +138,14 @@ services:
       - PG_TDE_KEY_PROVIDER=vault
     ports:
       - "5432:5432"
+      - "6432:6432"
       - "8008:8008"
     networks:
       - pg-network
     volumes:
       - postgres-one-data:/data/db
       - ./config/patroni/patroni-one.yml:/etc/patroni/patroni.yml
+      - ./config/pgbouncer:/etc/pgbouncer
       - ./storage/vault/secrets:/etc/postgresql/secrets:ro
     depends_on:
       etcd1:
@@ -208,12 +210,14 @@ services:
       - PG_TDE_KEY_PROVIDER=vault
     ports:
       - "5433:5432"
+      - "6433:6432"
       - "8009:8008"
     networks:
       - pg-network
     volumes:
       - postgres-two-data:/data/db
       - ./config/patroni/patroni-two.yml:/etc/patroni/patroni.yml
+      - ./config/pgbouncer:/etc/pgbouncer
       - ./storage/vault/secrets:/etc/postgresql/secrets:ro
     depends_on:
       pg-tde-init:
@@ -231,6 +235,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
 
 networks:
   pg-network:

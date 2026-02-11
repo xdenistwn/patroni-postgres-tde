@@ -2,4 +2,3 @@
 *.log
 .DS_Store
 node_modules/
-fix-indentation.sh

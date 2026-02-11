@@ -9,16 +9,16 @@ echo "------------------------"
 # 1. Parse arguments automatically appended by Patroni
 for i in "$@"; do
   case $i in
-  --datadir=*)
-  DATA_DIR="${i#*=}"
-  ;;
-  --connstring=*)
-  CONNSTRING="${i#*=}"
-  # Extract values from connstring using sed
-  REPLICATION_HOST=$(echo "$CONNSTRING" | sed -n 's/.*host=\([^ ]*\).*/\1/p')
-  REPLICATION_PORT=$(echo "$CONNSTRING" | sed -n 's/.*port=\([^ ]*\).*/\1/p')
-  REPLICATION_USER=$(echo "$CONNSTRING" | sed -n 's/.*user=\([^ ]*\).*/\1/p')
-  ;;
+    --datadir=*)
+    DATA_DIR="${i#*=}"
+    ;;
+    --connstring=*)
+    CONNSTRING="${i#*=}"
+    # Extract values from connstring using sed
+    REPLICATION_HOST=$(echo "$CONNSTRING" | sed -n 's/.*host=\([^ ]*\).*/\1/p')
+    REPLICATION_PORT=$(echo "$CONNSTRING" | sed -n 's/.*port=\([^ ]*\).*/\1/p')
+    REPLICATION_USER=$(echo "$CONNSTRING" | sed -n 's/.*user=\([^ ]*\).*/\1/p')
+    ;;
   esac
 done
 

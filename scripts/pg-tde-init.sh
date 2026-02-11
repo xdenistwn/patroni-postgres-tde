@@ -20,13 +20,15 @@ MASTER_KEY_NAME="global-master-key"
 echo "Waiting for Patroni cluster to have a leader..."
 while true; do
   LEADER_INFO=$(curl -s http://postgres-one:8008/cluster)
+
   if [ $? -eq 0 ] && [ -n "$LEADER_INFO" ]; then
-  LEADER=$(echo "$LEADER_INFO" | jq -r '.members[]? | select(.role=="leader") | .name' 2>/dev/null)
-  if [ -n "$LEADER" ] && [ "$LEADER" != "null" ]; then
-  echo "Found leader: $LEADER"
-  break
+    LEADER=$(echo "$LEADER_INFO" | jq -r '.members[]? | select(.role=="leader") | .name' 2>/dev/null)
+    if [ -n "$LEADER" ] && [ "$LEADER" != "null" ]; then
+      echo "Found leader: $LEADER"
+      break
+    fi
   fi
-  fi
+  
   echo "Waiting for leader..."
   sleep 2
 done

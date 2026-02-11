@@ -5,7 +5,7 @@ set -e
 yes | cp storage/vault/secrets/token.example.txt storage/vault/secrets/vault_token.txt
 
 echo "Starting Postgres Patroni cluster with HashiCorp Vault..."
-docker-compose up -d
+docker-compose up
 
 echo "Waiting for services to be healthy..."
 # Simple wait for simplicity, healthchecks in docker-compose are better
