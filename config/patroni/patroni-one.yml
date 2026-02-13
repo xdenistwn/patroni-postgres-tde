@@ -57,8 +57,9 @@ bootstrap:
         shared_preload_libraries: "pg_tde"
         pg_tde.wal_encrypt: "off"
       
-        # Archive mode (disabled for now, enable with pgBackRest)
-        archive_mode: "off"
+        # Archive mode (enabled with pgBackRest)
+        archive_mode: "on"
+        archive_command: "pgbackrest --stanza=patroni-tde archive-push %p"
   
   initdb:
     - encoding: UTF8
@@ -96,6 +97,9 @@ postgresql:
     command: "/usr/local/bin/patroni-tde-basebackup.sh"
     checkpoint: fast
     max-rate: 100M
+
+  recovery_conf:
+    restore_command: 'pgbackrest --stanza=patroni-tde archive-get %f "%p"'
 
 tags:
   nofailover: false

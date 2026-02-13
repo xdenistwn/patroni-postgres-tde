@@ -116,6 +116,45 @@ services:
     networks:
       - pg-network
 
+  # MinIO for S3-compatible storage
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    hostname: minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - pg-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Create MinIO bucket
+  createbuckets:
+    image: minio/mc
+    container_name: minio_mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb -p myminio/${MINIO_BUCKET};
+      /usr/bin/mc anonymous set public myminio/${MINIO_BUCKET};
+      exit 0;
+      "
+    networks:
+      - pg-network
+
   # PostgreSQL Master node with Patroni
   postgres-one:
     image: postgres_patroni:latest
@@ -134,8 +173,26 @@ services:
       - PATRONI_SUPERUSER_USERNAME=${PATRONI_PG_SUPERUSER}
       - PATRONI_SUPERUSER_PASSWORD=${PATRONI_PG_PASSWORD}
       # pg_tde configuration
+      # pg_tde configuration
       - ENABLE_PG_TDE=1
       - PG_TDE_KEY_PROVIDER=vault
+      # pgBackRest configuration
+      - PGBACKREST_STANZA=patroni-tde
+      - PGBACKREST_REPO1_TYPE=s3
+      - PGBACKREST_REPO1_S3_KEY=${MINIO_ROOT_USER}
+      - PGBACKREST_REPO1_S3_KEY_SECRET=${MINIO_ROOT_PASSWORD}
+      - PGBACKREST_REPO1_S3_BUCKET=${MINIO_BUCKET}
+      - PGBACKREST_REPO1_S3_ENDPOINT=minio:9000
+      - PGBACKREST_REPO1_S3_URI_STYLE=path
+      - PGBACKREST_REPO1_S3_REGION=us-east-1
+      - PGBACKREST_REPO1_STORAGE_VERIFY_TLS=n
+      - PGBACKREST_REPO1_STORAGE_PORT=9000
+      - PGBACKREST_REPO1_STORAGE_HOST=minio
+      - PGBACKREST_REPO1_PATH=/pgbackrest
+      - PGBACKREST_PG1_PATH=/data/db
+      - PGBACKREST_LOG_LEVEL_CONSOLE=info
+      - PGBACKREST_LOG_LEVEL_FILE=info
+      - PGBACKREST_COMPRESS_TYPE=lz4
     ports:
       - "5432:5432"
       - "6432:6432"
@@ -157,6 +214,8 @@ services:
       vault:
         condition: service_healthy
       vault-init:
+        condition: service_completed_successfully
+      createbuckets:
         condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
@@ -208,6 +267,25 @@ services:
       # pg_tde configuration
       - ENABLE_PG_TDE=1
       - PG_TDE_KEY_PROVIDER=vault
+      # pgBackRest configuration
+      - PGBACKREST_STANZA=patroni-tde
+      - PGBACKREST_REPO1_TYPE=s3
+      - PGBACKREST_REPO1_S3_KEY=${MINIO_ROOT_USER}
+      - PGBACKREST_REPO1_S3_KEY_SECRET=${MINIO_ROOT_PASSWORD}
+      - PGBACKREST_REPO1_S3_BUCKET=${MINIO_BUCKET}
+      - PGBACKREST_REPO1_S3_ENDPOINT=minio:9000
+      - PGBACKREST_REPO1_S3_URI_STYLE=path
+      - PGBACKREST_REPO1_S3_REGION=us-east-1
+      - PGBACKREST_REPO1_S3_VERIFY_TLS=n
+      - PGBACKREST_REPO1_S3_VERIFY_SSL=n
+      - PGBACKREST_REPO1_STORAGE_VERIFY_TLS=n
+      - PGBACKREST_REPO1_STORAGE_PORT=9000
+      - PGBACKREST_REPO1_STORAGE_HOST=minio
+      - PGBACKREST_REPO1_PATH=/pgbackrest
+      - PGBACKREST_PG1_PATH=/data/db
+      - PGBACKREST_LOG_LEVEL_CONSOLE=info
+      - PGBACKREST_LOG_LEVEL_FILE=info
+      - PGBACKREST_COMPRESS_TYPE=lz4
     ports:
       - "5433:5432"
       - "6433:6432"
@@ -230,6 +308,8 @@ services:
         condition: service_healthy
       vault:
         condition: service_healthy
+      createbuckets:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
       interval: 10s
@@ -248,3 +328,4 @@ volumes:
   postgres-one-data:
   postgres-two-data:
   vault-data:
+  minio-data:

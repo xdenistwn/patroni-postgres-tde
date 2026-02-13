@@ -9,7 +9,10 @@ RUN dnf install -y \
   python3-devel \
   wget \
   jq \
-  pgbouncer \
+  percona-pgbouncer \
+  percona-pgbackrest \
+  lz4 \
+  zstd \
   net-tools \
   && dnf clean all \
   && rm -rf /var/cache/dnf
