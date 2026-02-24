@@ -116,6 +116,28 @@ services:
     networks:
       - pg-network
 
+  # pgBackRest Envelope Key Initialization Service
+  pgbackrest-keymgmt-init:
+    image: postgres_patroni:latest
+    container_name: pgbackrest-keymgmt-init
+    volumes:
+      - ./scripts:/scripts
+      - ./storage/vault/secrets:/etc/postgresql/secrets:ro
+      - postgres-one-data:/data/db
+    environment:
+      - VAULT_ADDR=${VAULT_ADDR:-http://vault:8200}
+      - VAULT_TOKEN_FILE=/etc/postgresql/secrets/pgbackrest_vault_token.txt
+      - VAULT_KEK_PATH=pgbackrest/kek
+      - VAULT_SECRET_MOUNT=secret
+      - DEK_FILE=/data/db/pgbackrest_dek.enc
+      - DEK_META_FILE=/data/db/pgbackrest_dek.meta
+    depends_on:
+      vault-init:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/bash", "/scripts/pgbackrest-keymgmt-init.sh"]
+    networks:
+      - pg-network
+
   # MinIO for S3-compatible storage
   minio:
     image: minio/minio:latest
@@ -130,10 +152,11 @@ services:
       - "9001:9001"
     volumes:
       - minio-data:/data
+      - ./storage/minio/certs:/root/.minio/certs
     networks:
       - pg-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-fk", "https://localhost:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -147,11 +170,13 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
-      /usr/bin/mc mb -p myminio/${MINIO_BUCKET};
-      /usr/bin/mc anonymous set public myminio/${MINIO_BUCKET};
+      /usr/bin/mc alias set myminio https://minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD} --insecure;
+      /usr/bin/mc mb -p myminio/${MINIO_BUCKET} --insecure;
+      /usr/bin/mc anonymous set public myminio/${MINIO_BUCKET} --insecure;
       exit 0;
       "
+    volumes:
+      - ./storage/minio/certs:/certs:ro
     networks:
       - pg-network
 
@@ -182,17 +207,17 @@ services:
       - PGBACKREST_REPO1_S3_KEY=${MINIO_ROOT_USER}
       - PGBACKREST_REPO1_S3_KEY_SECRET=${MINIO_ROOT_PASSWORD}
       - PGBACKREST_REPO1_S3_BUCKET=${MINIO_BUCKET}
-      - PGBACKREST_REPO1_S3_ENDPOINT=minio:9000
+      - PGBACKREST_REPO1_S3_ENDPOINT=https://minio:9000
       - PGBACKREST_REPO1_S3_URI_STYLE=path
       - PGBACKREST_REPO1_S3_REGION=us-east-1
       - PGBACKREST_REPO1_STORAGE_VERIFY_TLS=n
-      - PGBACKREST_REPO1_STORAGE_PORT=9000
-      - PGBACKREST_REPO1_STORAGE_HOST=minio
+      - PGBACKREST_REPO1_STORAGE_CA_FILE=/certs/public.crt
       - PGBACKREST_REPO1_PATH=/pgbackrest
       - PGBACKREST_PG1_PATH=/data/db
       - PGBACKREST_LOG_LEVEL_CONSOLE=info
       - PGBACKREST_LOG_LEVEL_FILE=info
       - PGBACKREST_COMPRESS_TYPE=lz4
+      - PGBACKREST_ARCHIVE_CHECK=n
     ports:
       - "5432:5432"
       - "6432:6432"
@@ -203,7 +228,9 @@ services:
       - postgres-one-data:/data/db
       - ./config/patroni/patroni-one.yml:/etc/patroni/patroni.yml
       - ./config/pgbouncer:/etc/pgbouncer
+      - ./storage/minio/certs:/certs:ro
       - ./storage/vault/secrets:/etc/postgresql/secrets:ro
+      - ./scripts/pgbackrest-get-cipher-pass.sh:/usr/local/bin/pgbackrest-get-cipher-pass.sh:ro
     depends_on:
       etcd1:
         condition: service_healthy
@@ -214,6 +241,8 @@ services:
       vault:
         condition: service_healthy
       vault-init:
+        condition: service_completed_successfully
+      pgbackrest-keymgmt-init:
         condition: service_completed_successfully
       createbuckets:
         condition: service_completed_successfully
@@ -273,19 +302,17 @@ services:
       - PGBACKREST_REPO1_S3_KEY=${MINIO_ROOT_USER}
       - PGBACKREST_REPO1_S3_KEY_SECRET=${MINIO_ROOT_PASSWORD}
       - PGBACKREST_REPO1_S3_BUCKET=${MINIO_BUCKET}
-      - PGBACKREST_REPO1_S3_ENDPOINT=minio:9000
+      - PGBACKREST_REPO1_S3_ENDPOINT=https://minio:9000
       - PGBACKREST_REPO1_S3_URI_STYLE=path
       - PGBACKREST_REPO1_S3_REGION=us-east-1
-      - PGBACKREST_REPO1_S3_VERIFY_TLS=n
-      - PGBACKREST_REPO1_S3_VERIFY_SSL=n
       - PGBACKREST_REPO1_STORAGE_VERIFY_TLS=n
-      - PGBACKREST_REPO1_STORAGE_PORT=9000
-      - PGBACKREST_REPO1_STORAGE_HOST=minio
+      - PGBACKREST_REPO1_STORAGE_CA_FILE=/certs/public.crt
       - PGBACKREST_REPO1_PATH=/pgbackrest
       - PGBACKREST_PG1_PATH=/data/db
       - PGBACKREST_LOG_LEVEL_CONSOLE=info
       - PGBACKREST_LOG_LEVEL_FILE=info
       - PGBACKREST_COMPRESS_TYPE=lz4
+      - PGBACKREST_ARCHIVE_CHECK=n
     ports:
       - "5433:5432"
       - "6433:6432"
@@ -296,9 +323,13 @@ services:
       - postgres-two-data:/data/db
       - ./config/patroni/patroni-two.yml:/etc/patroni/patroni.yml
       - ./config/pgbouncer:/etc/pgbouncer
+      - ./storage/minio/certs:/certs:ro
       - ./storage/vault/secrets:/etc/postgresql/secrets:ro
+      - ./scripts/pgbackrest-get-cipher-pass.sh:/usr/local/bin/pgbackrest-get-cipher-pass.sh:ro
     depends_on:
       pg-tde-init:
+        condition: service_completed_successfully
+      pgbackrest-keymgmt-init:
         condition: service_completed_successfully
       etcd1:
         condition: service_healthy

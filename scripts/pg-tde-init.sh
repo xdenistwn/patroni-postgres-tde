@@ -71,9 +71,4 @@ else
   echo "Default principal key is already configured."
 fi
 
-# --- 2. WAL ENCRYPTION SETUP ---
-echo "Enabling WAL encryption..."
-run_sql "ALTER SYSTEM SET pg_tde.wal_encrypt = on;"
-run_sql "SELECT pg_reload_conf();"
-
 echo "Cluster initialization complete on $LEADER."

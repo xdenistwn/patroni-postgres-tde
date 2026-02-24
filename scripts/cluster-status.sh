@@ -4,8 +4,8 @@ set -e
 
 # Define Patroni endpoints
 PATRONI_ENDPOINTS=(
-  "postgres-one:8008"
-  "postgres-two:8008"
+  "localhost:8008"
+  "localhost:8009"
 )
 
 echo "=========================================="
@@ -19,7 +19,7 @@ SUCCESSFUL_ENDPOINT=""
 
 for ENDPOINT in "${PATRONI_ENDPOINTS[@]}"; do
   echo "Trying endpoint: $ENDPOINT..."
-  CLUSTER_INFO=$(docker exec postgres-one curl -s "http://$ENDPOINT/cluster" 2>/dev/null || echo "")
+  CLUSTER_INFO=$(curl -s "http://$ENDPOINT/cluster" 2>/dev/null || echo "")
   
   if [ -n "$CLUSTER_INFO" ] && [ "$CLUSTER_INFO" != "null" ]; then
     SUCCESSFUL_ENDPOINT="$ENDPOINT"
