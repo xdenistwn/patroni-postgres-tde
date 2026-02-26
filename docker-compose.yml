@@ -116,28 +116,6 @@ services:
     networks:
       - pg-network
 
-  # pgBackRest Envelope Key Initialization Service
-  pgbackrest-keymgmt-init:
-    image: postgres_patroni:latest
-    container_name: pgbackrest-keymgmt-init
-    volumes:
-      - ./scripts:/scripts
-      - ./storage/vault/secrets:/etc/postgresql/secrets:ro
-      - postgres-one-data:/data/db
-    environment:
-      - VAULT_ADDR=${VAULT_ADDR:-http://vault:8200}
-      - VAULT_TOKEN_FILE=/etc/postgresql/secrets/pgbackrest_vault_token.txt
-      - VAULT_KEK_PATH=pgbackrest/kek
-      - VAULT_SECRET_MOUNT=secret
-      - DEK_FILE=/data/db/pgbackrest_dek.enc
-      - DEK_META_FILE=/data/db/pgbackrest_dek.meta
-    depends_on:
-      vault-init:
-        condition: service_completed_successfully
-    entrypoint: ["/bin/bash", "/scripts/pgbackrest-keymgmt-init.sh"]
-    networks:
-      - pg-network
-
   # MinIO for S3-compatible storage
   minio:
     image: minio/minio:latest
@@ -230,7 +208,6 @@ services:
       - ./config/pgbouncer:/etc/pgbouncer
       - ./storage/minio/certs:/certs:ro
       - ./storage/vault/secrets:/etc/postgresql/secrets:ro
-      - ./scripts/pgbackrest-get-cipher-pass.sh:/usr/local/bin/pgbackrest-get-cipher-pass.sh:ro
     depends_on:
       etcd1:
         condition: service_healthy
@@ -241,8 +218,6 @@ services:
       vault:
         condition: service_healthy
       vault-init:
-        condition: service_completed_successfully
-      pgbackrest-keymgmt-init:
         condition: service_completed_successfully
       createbuckets:
         condition: service_completed_successfully
@@ -325,11 +300,8 @@ services:
       - ./config/pgbouncer:/etc/pgbouncer
       - ./storage/minio/certs:/certs:ro
       - ./storage/vault/secrets:/etc/postgresql/secrets:ro
-      - ./scripts/pgbackrest-get-cipher-pass.sh:/usr/local/bin/pgbackrest-get-cipher-pass.sh:ro
     depends_on:
       pg-tde-init:
-        condition: service_completed_successfully
-      pgbackrest-keymgmt-init:
         condition: service_completed_successfully
       etcd1:
         condition: service_healthy
