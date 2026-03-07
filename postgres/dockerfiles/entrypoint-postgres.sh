@@ -1,0 +1,57 @@
+#!/bin/bash
+set -e
+
+# Wait for etcd to be ready
+ETCD_CACERT="${PATRONI_ETCD3_CACERT:-/etc/postgres/certs/ca.crt}"
+ETCD_CERT="${PATRONI_ETCD3_CERT:-/etc/postgres/certs/public.crt}"
+ETCD_KEY="${PATRONI_ETCD3_KEY:-/etc/postgres/certs/private.key}"
+
+echo "Waiting for etcd cluster to be ready..."
+for i in {1..30}; do
+  if curl -sf --max-time 5 \
+      --cacert "$ETCD_CACERT" --cert "$ETCD_CERT" --key "$ETCD_KEY" \
+      https://etcd1:2379/health > /dev/null 2>&1 \
+  || curl -sf --max-time 5 \
+      --cacert "$ETCD_CACERT" --cert "$ETCD_CERT" --key "$ETCD_KEY" \
+      https://etcd2:2379/health > /dev/null 2>&1 \
+  || curl -sf --max-time 5 \
+      --cacert "$ETCD_CACERT" --cert "$ETCD_CERT" --key "$ETCD_KEY" \
+      https://etcd3:2379/health > /dev/null 2>&1; then
+    echo "etcd cluster is ready"
+    break
+  fi
+  echo "Waiting for etcd... ($i/30)"
+  sleep 2
+done
+
+# Fix permissions on data directory
+# PostgreSQL requires the data directory to have 0700 or 0750 permissions
+DATA_DIR="${PATRONI_POSTGRESQL_DATA_DIR:-/data/db}"
+if [ -d "$DATA_DIR" ]; then
+  echo "Checking permissions on $DATA_DIR..."
+  CURRENT_PERMS=$(stat -c '%a' "$DATA_DIR" 2>/dev/null || stat -f '%A' "$DATA_DIR" 2>/dev/null || echo "unknown")
+  echo "Current permissions: $CURRENT_PERMS"
+  
+  # Only fix if we can (i.e., we own the directory or are root)
+  if [ "$(stat -c '%U' "$DATA_DIR" 2>/dev/null || stat -f '%Su' "$DATA_DIR" 2>/dev/null)" = "postgres" ] || [ "$(id -u)" = "0" ]; then
+    echo "Setting permissions to 0700..."
+    chmod 0700 "$DATA_DIR" || echo "Warning: Could not set permissions"
+  fi
+fi
+
+# Start PgBouncer in the background after PostgreSQL is ready
+(
+  echo "Waiting for PostgreSQL to be ready before starting PgBouncer..."
+  for i in {1..30}; do
+    if pg_isready -h 127.0.0.1 -p 5432 > /dev/null 2>&1; then
+      echo "PostgreSQL is ready, starting PgBouncer on port 6432..."
+      pgbouncer -d /etc/pgbouncer/pgbouncer.ini
+      echo "PgBouncer started successfully"
+      break
+    fi
+    sleep 2
+  done
+) &
+
+# Start Patroni
+exec "$@"

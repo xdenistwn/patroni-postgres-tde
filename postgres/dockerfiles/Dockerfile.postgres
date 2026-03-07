@@ -1,0 +1,44 @@
+FROM percona/percona-distribution-postgresql:18.1
+
+USER root
+
+# Install required packages using dnf
+# We use 'dnf clean all' to keep the image slim
+RUN dnf install -y \
+  python3-pip \
+  python3-devel \
+  wget \
+  jq \
+  percona-pgbouncer \
+  percona-pgbackrest \
+  lz4 \
+  zstd \
+  net-tools \
+  && dnf clean all \
+  && rm -rf /var/cache/dnf
+
+# Install Patroni
+USER postgres
+RUN pip3 install patroni[etcd3]
+
+
+# Create necessary directories
+USER root
+RUN mkdir -p /etc/patroni /data/db /data/pg_tde_keys && \
+  mkdir -p /etc/postgresql/secrets && touch /etc/postgresql/secrets/vault_token.txt && \
+  mkdir -p /etc/pgbouncer && \
+  chown -R postgres:postgres /etc/patroni /data /etc/postgresql /etc/pgbouncer && \
+  chmod 700 /data/db /data/pg_tde_keys && \
+  chmod 600 /etc/postgresql/secrets/vault_token.txt
+
+# Copy entrypoint and helper scripts
+COPY entrypoint-postgres.sh /entrypoint.sh
+COPY patroni-tde-basebackup.sh /usr/local/bin/patroni-tde-basebackup.sh
+RUN chmod +x /entrypoint.sh /usr/local/bin/patroni-tde-basebackup.sh
+
+# Expose PostgreSQL, Patroni, and PgBouncer ports
+USER postgres
+EXPOSE 5432 6432 8008
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["patroni", "/etc/patroni/patroni.yml"]

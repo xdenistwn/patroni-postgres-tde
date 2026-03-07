@@ -1,0 +1,6 @@
+version: v1
+
+tls:
+  certs:
+  - key: /etc/minkms/certs/private.key
+    cert: /etc/minkms/certs/public.crt

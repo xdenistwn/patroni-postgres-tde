@@ -1,1 +1,0 @@
-mv vault_token.example.txt vault_token.txt

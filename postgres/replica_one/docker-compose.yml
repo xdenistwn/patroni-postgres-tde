@@ -1,0 +1,53 @@
+services:
+  # PostgreSQL Master node with Patroni
+  postgres-two:
+    image: postgres_patroni_tde:18.1
+    container_name: postgres-two
+    hostname: postgres-two
+    environment:
+      - PATRONI_NAME=postgres-two
+      - PATRONI_SCOPE=postgres-cluster
+      - PATRONI_NAMESPACE=/db/
+      - PATRONI_ETCD3_HOSTS=etcd1:2379,etcd2:2379,etcd3:2379
+      - PATRONI_ETCD3_PROTOCOL=https
+      - PATRONI_ETCD3_CACERT=/etc/postgres/certs/ca.crt
+      - PATRONI_ETCD3_CERT=/etc/postgres/certs/public.crt
+      - PATRONI_ETCD3_KEY=/etc/postgres/certs/private.key
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=postgres-two:8008
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=postgres-two:5432
+      - PATRONI_POSTGRESQL_DATA_DIR=/data/db
+      - PATRONI_REPLICATION_USERNAME=${PATRONI_PG_REPLICATION_USERNAME}
+      - PATRONI_REPLICATION_PASSWORD=${PATRONI_PG_REPLICATION_PASSWORD}
+      - PATRONI_SUPERUSER_USERNAME=${PATRONI_PG_SUPERUSER}
+      - PATRONI_SUPERUSER_PASSWORD=${PATRONI_PG_PASSWORD}
+      # pg_tde configuration
+      - ENABLE_PG_TDE=1
+      - PG_TDE_KEY_PROVIDER=vault
+      # pgbackrest configuration
+      - PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf
+      - PGBACKREST_STANZA=postgres-patroni-tde
+    ports:
+      - "5433:5432"
+      - "6433:6432"
+      - "8009:8008"
+    networks:
+      - pg_network
+    volumes:
+      - postgres_two_data:/data/db
+      - ./patroni-two.yml:/etc/patroni/patroni.yml
+      - ./pgbouncer:/etc/pgbouncer
+      - ./certs:/etc/postgres/certs:ro
+      - ./vault_token.txt:/etc/postgresql/secrets/vault_token.txt:ro
+      - ./pgbackrest:/etc/pgbackrest
+    healthcheck:
+      test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  pg_network:
+    external: true
+
+volumes:
+  postgres_two_data:

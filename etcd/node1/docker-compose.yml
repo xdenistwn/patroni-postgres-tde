@@ -1,0 +1,46 @@
+services:
+  # etcd cluster - 3 nodes for high availability
+  etcd1:
+    image: quay.io/coreos/etcd:v3.5.16
+    container_name: etcd1
+    hostname: etcd1
+    environment:
+      - ETCD_NAME=etcd1
+      # Use https for all URLs
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=https://etcd1:2380
+      - ETCD_LISTEN_PEER_URLS=https://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=https://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=https://etcd1:2379
+      - ETCD_INITIAL_CLUSTER=etcd1=https://etcd1:2380,etcd2=https://etcd2:2380,etcd3=https://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_CLUSTER_TOKEN=etcd-cluster-token
+      # Client TLS settings
+      - ETCD_CERT_FILE=/certs/public.crt
+      - ETCD_KEY_FILE=/certs/private.key
+      - ETCD_TRUSTED_CA_FILE=/certs/ca.crt
+      - ETCD_CLIENT_CERT_AUTH=true
+      # Peer TLS settings (node-to-node communication)
+      - ETCD_PEER_CERT_FILE=/certs/public.crt
+      - ETCD_PEER_KEY_FILE=/certs/private.key
+      - ETCD_PEER_TRUSTED_CA_FILE=/certs/ca.crt
+      - ETCD_PEER_CLIENT_CERT_AUTH=true
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    networks:
+      - pg_network
+    volumes:
+      - etcd1_data:/etcd-data
+      - ./certs:/certs:ro
+    healthcheck:
+      test: ["CMD", "etcdctl", "--endpoints=https://etcd1:2379", "--cacert=/certs/ca.crt", "--cert=/certs/public.crt", "--key=/certs/private.key", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  etcd1_data:
+
+networks:
+  pg_network:
+    external: true

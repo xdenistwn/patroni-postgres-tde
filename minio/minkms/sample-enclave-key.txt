@@ -1,0 +1,18 @@
+Your API key:
+
+   k2:xF_SJT0pLtJMBP0LabwcMXQGpM7hkv1XEdO9Tt6aEQ0
+
+This is the only time it is shown. Keep it secret and secure!
+
+Your API key's identity:
+
+   h1:w1pDrp1Rps9TsUiWu38m9elVmBArCic7lX5XZtZontM
+
+The identity is not a secret and can be shared securely.
+Peers need your identity in order to verify your API key.
+
+This identity can be re-computed again via:
+
+  $ minkms identity k2:xF_SJT0pLtJMBP0LabwcMXQGpM7hkv1XEdO9Tt6aEQ0
+
+Added identity to server successfully.

@@ -1,0 +1,41 @@
+# docker run -dt                                             \
+#   -p 9000:9000 -p 9001:9001                                \
+#   -v $HOME/minio/data:/mnt/data                            \
+#   -v $HOME/minio/minio.license:/minio.license              \
+#   -v $HOME/minio/certs:/etc/minio/certs                    \
+#   --name "aistor-server"                                   \
+#   quay.io/minio/aistor/minio:latest minio server /mnt/data \
+#   --license /minio.license
+
+services:
+  minio:
+    image: quay.io/minio/aistor/minio:latest
+    container_name: minio
+    hostname: minio
+    networks:
+      - pg_network
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/mnt/data
+      - ./certs:/root/.minio/certs
+      - ./license/minio.license:/minio.license
+    environment:
+      - MINIO_KMS_SERVER=https://minkms:7373
+      - MINIO_KMS_API_KEY=k2:J-VCH_j6egEqkxRpgG6LTikvb2X2I1nyIoaB0wRD-P8
+      - MINIO_KMS_SSE_KEY=postgres-arch-sample-key-123
+      - MINIO_KMS_ENCLAVE=postgres-arch
+    command: ["server", "/mnt/data", "--license", "/minio.license"]
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+volumes:
+  minio_data:
+
+networks:
+  pg_network:
+    external: true

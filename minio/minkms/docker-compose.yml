@@ -1,0 +1,23 @@
+services:
+  minkms:
+    image: quay.io/minio/aistor/minkms:latest
+    container_name: minkms
+    hostname: minkms
+    networks:
+      - pg_network
+    ports:
+      - "7373:7373"
+    volumes:
+      - minkms_data:/mnt/minio-kms
+      - ./certs:/etc/minkms/certs
+      - ./config.yaml:/etc/minkms/config.yaml
+    env_file:
+      - minkms.env
+    command: ["server", "--config", "/etc/minkms/config.yaml", "/mnt/minio-kms"]
+
+volumes:
+  minkms_data:
+
+networks:
+  pg_network:
+    external: true
