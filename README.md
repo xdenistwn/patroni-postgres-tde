@@ -2,6 +2,8 @@
 After extensive research and trial-and-error over the past two weeks, I am presenting this repository which provides a simple high-availability PostgreSQL cluster setup using Patroni, etcd, pg_tde, and HashiCorp Vault in container. It ensures that your data is encrypted at rest (TDE) and that encryption keys are securely managed in a centralized Vault instance.
 > ⚠️ This repository is currently under active development and constant improvement. It is primarily used for research and development purposes and may not be production-ready.
 
+> ⚠️ All Certificates are self-signed and for development purposes only. nothing to worry.
+
 ## Overview
 The architecture consists of:
 - **PostgreSQL 18 (Percona Distribution)**: High-performance database engine with `pg_tde` built-in.
