@@ -32,29 +32,9 @@ The architecture consists of:
 | Support WAL/Basebackup encryption using `pg_tde_basebackup` and `pg_tde.wal_encrypt` | ✅ | main |
 | Handle Master Key rotation | ✅ | main |
 | PgBouncer layer implementation | ✅ | main |
-| Archiving into Object Storage (S3, MinIO) | - | - |
+| Archiving into Object Storage with SSE (S3, MinIO) | ✅ | main |
 | Monitoring (Prometheus, Grafana) | - | - |
 | Apply SSL/TLS between services | - | - |
 
 ### Setup
-1. Clone the repository:
-```bash
-git clone https://github.com/your-username/patroni-postgres-tde.git
-cd patroni-postgres-tde
-```
-
-2. Copy the example environment file and modify it as needed:
-```bash
-cp .env.example .env
-vi .env
-```
-
-3. Build image:
-```bash
-docker-compose -f dockerfiles/postgres/docker-compose.build.yml build
-```
-
-4. Start cluster:
-```bash
-./scripts/run-cluster.sh
-```
+TBA
