@@ -24,6 +24,7 @@ services:
       - ETCD_PEER_KEY_FILE=/certs/private.key
       - ETCD_PEER_TRUSTED_CA_FILE=/certs/ca.crt
       - ETCD_PEER_CLIENT_CERT_AUTH=true
+      - TZ=Asia/Jakarta
     ports:
       - "2479:2379"
       - "2480:2380"

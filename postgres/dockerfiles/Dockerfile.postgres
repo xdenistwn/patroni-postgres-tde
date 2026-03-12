@@ -1,29 +1,39 @@
 FROM percona/percona-distribution-postgresql:18.1
 
-USER root
-
 # Install required packages using dnf
 # We use 'dnf clean all' to keep the image slim
-RUN dnf install -y \
+USER root
+RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-aarch64/pgdg-redhat-repo-latest.noarch.rpm \
+  && dnf -qy module disable postgresql \
+  && dnf install -y \
   python3-pip \
   python3-devel \
   wget \
   jq \
+  git \
+  make \
   percona-pgbouncer \
   percona-pgbackrest \
+  pg_partman_18 \
   lz4 \
   zstd \
-  net-tools \
-  && dnf clean all \
-  && rm -rf /var/cache/dnf
+  net-tools
 
 # Install Patroni
 USER postgres
 RUN pip3 install patroni[etcd3]
 
+# clean up devel
+USER root
+RUN dnf remove -y \
+  python3-devel \
+  wget \
+  git \
+  make \
+  && dnf clean all \
+  && rm -rf /var/cache/dnf
 
 # Create necessary directories
-USER root
 RUN mkdir -p /etc/patroni /data/db /data/pg_tde_keys && \
   mkdir -p /etc/postgresql/secrets && touch /etc/postgresql/secrets/vault_token.txt && \
   mkdir -p /etc/pgbouncer && \

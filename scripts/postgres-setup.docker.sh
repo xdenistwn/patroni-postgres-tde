@@ -81,3 +81,8 @@ else
 fi
 
 echo "Cluster initialization complete on $TARGET_HOST."
+
+# --- 2. Setup pg_partman ---
+echo "--- Setting up pg_partman ---"
+echo "Creating extension pg_partman..."
+run_sql "CREATE EXTENSION IF NOT EXISTS pg_partman;"

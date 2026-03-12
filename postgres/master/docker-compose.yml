@@ -26,6 +26,8 @@ services:
       # pgbackrest configuration
       - PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf
       - PGBACKREST_STANZA=postgres-patroni-tde
+      # timezone
+      - TZ=Asia/Jakarta
     ports:
       - "5432:5432"
       - "6432:6432"

@@ -11,6 +11,8 @@ services:
       - minkms_data:/mnt/minio-kms
       - ./certs:/etc/minkms/certs
       - ./config.yaml:/etc/minkms/config.yaml
+    environment:
+      - TZ=Asia/Jakarta
     env_file:
       - minkms.env
     command: ["server", "--config", "/etc/minkms/config.yaml", "/mnt/minio-kms"]

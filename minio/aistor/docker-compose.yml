@@ -26,6 +26,7 @@ services:
       - MINIO_KMS_API_KEY=k2:J-VCH_j6egEqkxRpgG6LTikvb2X2I1nyIoaB0wRD-P8
       - MINIO_KMS_SSE_KEY=postgres-arch-sample-key-123
       - MINIO_KMS_ENCLAVE=postgres-arch
+      - TZ=Asia/Jakarta
     command: ["server", "/mnt/data", "--license", "/minio.license"]
     healthcheck:
       test: ["CMD", "curl", "-fk", "https://localhost:9000/minio/health/live"]

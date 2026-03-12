@@ -55,7 +55,7 @@ logs-etcd:
 	docker-compose -f etcd/node1/docker-compose.yml logs -f
 	docker-compose -f etcd/node2/docker-compose.yml logs -f
 	docker-compose -f etcd/node3/docker-compose.yml logs -f
-rmv-etcd:
+remove-etcd:
 	docker volume rm node1_etcd1_data;
 	docker volume rm node2_etcd2_data;
 	docker volume rm node3_etcd3_data;
@@ -66,7 +66,7 @@ down-pg1:
 	docker-compose -f postgres/master/docker-compose.yml down;
 stop-pg1:
 	docker-compose -f postgres/master/docker-compose.yml stop;
-rmv-pg1:
+remove-pg1:
 	docker volume rm master_postgres_one_data;
 logs-pg1:
 	docker-compose -f postgres/master/docker-compose.yml logs -f;
@@ -77,7 +77,14 @@ down-pg2:
 	docker-compose -f postgres/replica_one/docker-compose.yml down;
 stop-pg2:
 	docker-compose -f postgres/replica_one/docker-compose.yml stop;
-rmv-pg2:
+remove-pg2:
 	docker volume rm replica_one_postgres_two_data;
 logs-pg2:
 	docker-compose -f postgres/replica_one/docker-compose.yml logs -f;
+
+remove-pg:
+	docker-compose -f postgres/master/docker-compose.yml down;
+	docker-compose -f postgres/replica_one/docker-compose.yml down;
+	docker volume rm master_postgres_one_data;
+	docker volume rm replica_one_postgres_two_data;
+
