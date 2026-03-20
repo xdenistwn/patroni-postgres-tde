@@ -6,21 +6,22 @@
 CREATE EXTENSION IF NOT EXISTS pg_partman;
 
 -- 2. create real table with the partition mode
-CREATE TABLE events_encrypted (
+CREATE TABLE events (
     id          BIGSERIAL,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
     payload     TEXT
 ) PARTITION BY RANGE (created_at);
 
--- 3. create parent table
+-- 3. create 
 SELECT public.create_parent(
-    p_parent_table  => 'public.events_encrypted',
+    p_parent_table  => 'public.events',
     p_control       => 'created_at',
-    p_interval      => '1 month'
+    p_interval      => '1 month',
+    p_premake       => 6
 );
 
 -- 4. insert some sample data
-INSERT INTO events_encrypted(created_at, payload) VALUES
+INSERT INTO events(created_at, payload) VALUES
     ('2025-11-15', 'november event'),
     ('2025-12-10', 'december event'),
     ('2026-01-20', 'january event'),
@@ -45,7 +46,7 @@ WHERE created_at >= '2026-02-01' AND created_at < '2026-02-01';
 -- the goals is for checking if the partition table got hit.
 EXPLAIN (ANALYZE, BUFFERS)
 SELECT * FROM events_encrypted
-WHERE created_at >= '2026-02-01' AND created_at < '2026-02-01';
+WHERE created_at >= '2026-01-01' AND created_at < '2026-03-01';
 
 -- 9. checking where the table file located in OS.
 -- it will return: base/5/16652

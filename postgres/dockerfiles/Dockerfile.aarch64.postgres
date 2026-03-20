@@ -3,21 +3,24 @@ FROM percona/percona-distribution-postgresql:18.1
 # Install required packages using dnf
 # We use 'dnf clean all' to keep the image slim
 USER root
+# Add PGDG repo (needed for pg_partman_18, pg_cron_18, pg_stat_monitor_18)
 RUN dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-9-aarch64/pgdg-redhat-repo-latest.noarch.rpm \
   && dnf -qy module disable postgresql \
   && dnf install -y \
-  python3-pip \
-  python3-devel \
-  wget \
-  jq \
-  git \
-  make \
-  percona-pgbouncer \
-  percona-pgbackrest \
-  pg_partman_18 \
-  lz4 \
-  zstd \
-  net-tools
+     python3-pip \
+     python3-devel \
+     wget \
+     jq \
+     git \
+     make \
+     percona-pgbouncer \
+     percona-pgbackrest \
+     pg_partman_18 \
+     percona-pg_repack18 \
+     pg_cron_18 \
+     lz4 \
+     zstd \
+     net-tools
 
 # Install Patroni
 USER postgres
@@ -30,6 +33,7 @@ RUN dnf remove -y \
   wget \
   git \
   make \
+  && dnf clean packages \
   && dnf clean all \
   && rm -rf /var/cache/dnf
 

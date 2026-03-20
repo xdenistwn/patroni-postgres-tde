@@ -1,7 +1,7 @@
 services:
   # PostgreSQL Master node with Patroni
   postgres-one:
-    image: postgres_patroni_tde:18.1
+    image: postgres_patroni_tde:18.1-dev
     container_name: postgres-one
     hostname: postgres-one
     environment:

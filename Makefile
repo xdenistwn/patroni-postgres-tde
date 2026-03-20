@@ -10,6 +10,9 @@
 # 	docker-compose -f minio/minkms/docker-compose.yml ps
 # 	docker-compose -f minio/aistor/docker-compose.yml ps
 
+create-network:
+	docker network create --driver bridge pg_network
+
 logs: logs-pg1 logs-pg2 logs-etcd
 
 up-minkms:

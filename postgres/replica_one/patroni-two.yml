@@ -58,7 +58,7 @@ bootstrap:
         log_timezone: "Asia/Jakarta"
   
         # pg_tde and pg_partman extensions
-        shared_preload_libraries: "pg_tde, pg_partman_bgw"
+        shared_preload_libraries: "pg_tde, pg_partman_bgw, pg_stat_monitor, pg_cron, pgaudit"
         pg_tde.wal_encrypt: "off"
         default_table_access_method: "tde_heap"
   

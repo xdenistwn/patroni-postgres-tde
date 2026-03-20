@@ -86,3 +86,19 @@ echo "Cluster initialization complete on $TARGET_HOST."
 echo "--- Setting up pg_partman ---"
 echo "Creating extension pg_partman..."
 run_sql "CREATE EXTENSION IF NOT EXISTS pg_partman;"
+
+# -- 3. Setup pg_repack
+echo "--- Setting up pg_repack ---"
+echo "Creating extension pg_repack..."
+run_sql "CREATE EXTENSION IF NOT EXISTS pg_repack; CREATE EXTENSION IF NOT EXISTS pgstattuple;"
+
+# -- 4. Setup pg_stat_monitor
+echo "--- Setting up pg_stat_monitor ---"
+echo "Creating extension pg_stat_monitor..."
+run_sql "CREATE EXTENSION IF NOT EXISTS pg_stat_monitor;"
+
+# -- 5. Setup pg_cron
+echo "--- Setting up pg_cron ---"
+echo "Creating extension pg_cron..."
+run_sql "CREATE EXTENSION IF NOT EXISTS pg_cron;"
+
