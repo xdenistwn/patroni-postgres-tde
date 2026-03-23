@@ -17,45 +17,42 @@ graph LR
         BENCH["pgBench\nbenchmarking"]
     end
 
-    subgraph "Connection Tier"
-        PGB["PgBouncer\nport 6432\ntransaction pool mode"]
-    end
-
-    subgraph "PostgreSQL + etcd Node 1"
+    subgraph "VM: PostgreSQL + etcd + PgBouncer Node 1"
         direction TB
+        PGB1["PgBouncer\nport 6432  (write/read)"]
         PG1["postgres-one\n(Patroni Leader)\nport 5432  Patroni API 8008"]
         E1["etcd1\nport 2379/2380\nmTLS"]
     end
 
-    subgraph "PostgreSQL + etcd Node 2"
+    subgraph "VM: PostgreSQL + etcd + PgBouncer Node 2"
         direction TB
+        PGB2["PgBouncer\nport 6432  (read-only)"]
         PG2["postgres-two\n(Patroni Replica)\nport 5432  Patroni API 8008"]
         E2["etcd2\nport 2379/2380\nmTLS"]
     end
 
-    subgraph "etcd Witness Node"
+    subgraph "VM: etcd Witness Node"
         E3["etcd3\nport 2379/2380\nmTLS"]
     end
 
     PG1 -- "Streaming Replication\nWAL shipping" --> PG2
 
     subgraph "Key Management"
-        VAULT["HashiCorp Vault\nport 8200\nKV v2 — path: tde/\nAppRole auth"]
-        MINKMS["MinKMS\nport 7373\nMinio KMS Server\nmTLS"]
+        VAULT["Vault :8200"]
+        MINKMS["MinKMS :7373"]
     end
 
     subgraph "Object Storage"
         MINIO["MinIO AIStor\nport 9000 API  9001 Console\nbucket: postgres-archive\nSSE-KMS enabled"]
     end
 
-    subgraph "Monitoring & Audit"
-        PGSM["pg_stat_monitor\n(loaded in PG shared libs)"]
-        PGAU["pgAudit\n(loaded in PG shared libs)"]
-    end
+    EXT["PostgreSQL Extensions:\npg_tde, pg_partman, pg_cron\npg_repack, pg_stat_monitor\npgAudit, pgBackRest"]
 
-    APP --> PGB
-    BENCH --> PGB
-    PGB --> PG1
+    APP -->|"write/read"| PGB1
+    APP -->|"read-only"| PGB2
+    BENCH -->|"write/read"| PGB1
+    PGB1 --> PG1
+    PGB2 --> PG2
 
     PG1 <-->|"leader election\nLock / TTL=30s"| E1
     PG1 <-->|"heartbeat"| E2
@@ -64,17 +61,17 @@ graph LR
     PG2 <-->|"DCS watch"| E2
     PG2 <-->|"DCS watch"| E3
 
-    PG1 -->|"Vault token\n(AppRole)\nkey provider HTTP"| VAULT
-    PG2 -->|"Vault token\nkey provider HTTP"| VAULT
+    PG1 -->|"key provider"| VAULT
+    PG2 -->|"key provider"| VAULT
 
-    PG1 -->|"pgBackRest\narchive-push WAL / base backup\nS3 path-style TLS"| MINIO
-    PG2 -->|"pgBackRest\narchive-get restore"| MINIO
+    PG1 -->|"archive-push\npgBackRest"| MINIO
+    PG2 -->|"archive-get"| MINIO
 
-    MINIO -->|"SSE-KMS API\nHTTPS port 7373"| MINKMS
-    MINKMS -.->|"wraps SSE keys\nusing Vault master key\n(manual integration)"| VAULT
+    MINIO -->|"SSE-KMS"| MINKMS
+    MINKMS -.->|"wraps key"| VAULT
 
-    PGSM -.->|"shared_preload_libraries"| PG1
-    PGAU -.->|"shared_preload_libraries"| PG1
+    EXT -.->|"active on"| PG1
+    EXT -.->|"active on"| PG2
 ```
 
 ## Component Dependency & Startup Order
@@ -123,7 +120,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    WRITE["INSERT / UPDATE\nfrom application"] --> PGB["PgBouncer\ntransaction pool"]
+    WRITE["INSERT / UPDATE\nfrom application"] --> PGB["PgBouncer (Primary)\ntransaction pool"]
     PGB --> PG["PostgreSQL 18\npg_tde active"]
     PG -->|"encrypt page\nusing tde_heap"| HEAP["Encrypted heap file\n/data/db/base/..."]
     PG -->|"WAL segment\n(pg_tde.wal_encrypt=off\nencrypts data blocks)"| WAL["WAL stream"]

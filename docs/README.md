@@ -8,70 +8,66 @@ This documentation covers a production-grade PostgreSQL 18 high-availability (HA
 
 ```mermaid
 graph TD
-    subgraph Clients
-        APP[Application / API]
+    subgraph "Client Tier"
+        APP["Application\n(any language)"]
+        BENCH["pgBench\nbenchmarking"]
     end
 
-    subgraph Connection Layer
-        PGB[PgBouncer :6432\nConnection Pool]
+    subgraph "VM: PostgreSQL + etcd + PgBouncer Node 1"
+        direction TB
+        PGB1["PgBouncer\nport 6432  (write/read)"]
+        PG1["postgres-one\n(Patroni Leader)\nport 5432  Patroni API 8008"]
+        E1["etcd1\nport 2379/2380\nmTLS"]
     end
 
-    subgraph PostgreSQL + etcd Node 1
-        PG1[postgres-one\nPatroni Leader\n:5432]
-        E1[etcd1 :2379]
+    subgraph "VM: PostgreSQL + etcd + PgBouncer Node 2"
+        direction TB
+        PGB2["PgBouncer\nport 6432  (read-only)"]
+        PG2["postgres-two\n(Patroni Replica)\nport 5432  Patroni API 8008"]
+        E2["etcd2\nport 2379/2380\nmTLS"]
     end
 
-    subgraph PostgreSQL + etcd Node 2
-        PG2[postgres-two\nPatroni Replica\n:5432]
-        E2[etcd2 :2379]
+    subgraph "VM: etcd Witness Node"
+        E3["etcd3\nport 2379/2380\nmTLS"]
     end
 
-    subgraph etcd Witness Node
-        E3[etcd3 :2379]
+    PG1 -- "Streaming Replication\nWAL shipping" --> PG2
+
+    subgraph "Key Management"
+        VAULT["Vault :8200"]
+        MINKMS["MinKMS :7373"]
     end
 
-    subgraph Key Management
-        VAULT[HashiCorp Vault :8200\nKV v2 — tde/ path]
-        MINKMS[MinKMS :7373\nMinio KMS Server]
+    subgraph "Object Storage"
+        MINIO["MinIO AIStor\nport 9000 API  9001 Console\nbucket: postgres-archive\nSSE-KMS enabled"]
     end
 
-    subgraph Object Storage
-        MINIO[MinIO AIStor :9000\nbucket: postgres-archive]
-    end
+    EXT["PostgreSQL Extensions:\npg_tde, pg_partman, pg_cron\npg_repack, pg_stat_monitor\npgAudit, pgBackRest"]
 
-    subgraph Extensions inside PostgreSQL
-        PGTDE[pg_tde\ntde_heap access method]
-        PGPART[pg_partman\npartition management]
-        PGCRON[pg_cron\nscheduled jobs]
-        PGREPACK[pg_repack\nbloat removal]
-        PGMON[pg_stat_monitor\nquery analytics]
-        PGAUDIT[pgAudit\naudit logging]
-        PGBR[pgBackRest\nbackup & PITR]
-    end
+    APP -->|"write/read"| PGB1
+    APP -->|"read-only"| PGB2
+    BENCH -->|"write/read"| PGB1
+    PGB1 --> PG1
+    PGB2 --> PG2
 
-    APP --> PGB
-    PGB --> PG1
-    PG1 -->|streaming replication| PG2
-    PG1 <-->|leader election / DCS| E1
-    PG1 <-->|leader election / DCS| E2
-    PG1 <-->|leader election / DCS| E3
-    PG2 <-->|DCS heartbeat| E1
+    PG1 <-->|"leader election\nLock / TTL=30s"| E1
+    PG1 <-->|"heartbeat"| E2
+    PG1 <-->|"heartbeat"| E3
+    PG2 <-->|"DCS watch"| E1
+    PG2 <-->|"DCS watch"| E2
+    PG2 <-->|"DCS watch"| E3
 
-    PG1 -->|WAL archive-push| MINIO
-    PG2 -->|archive-get / restore| MINIO
-    MINIO -->|SSE-KMS| MINKMS
-    MINKMS -.->|master key wrapping| VAULT
+    PG1 -->|"key provider"| VAULT
+    PG2 -->|"key provider"| VAULT
 
-    PG1 -->|key provider HTTP| VAULT
-    PG2 -->|key provider HTTP| VAULT
+    PG1 -->|"archive-push\npgBackRest"| MINIO
+    PG2 -->|"archive-get"| MINIO
 
-    PGTDE -.->|tde_heap| PG1
-    PGPART -.->|bgw| PG1
-    PGCRON -.->|bgw| PG1
-    PGREPACK -.->|CLI + locks| PG1
-    PGMON -.->|bgw| PG1
-    PGAUDIT -.->|bgw| PG1
-    PGBR -.->|archive cmd| PG1
+    MINIO -->|"SSE-KMS"| MINKMS
+    MINKMS -.->|"wraps key"| VAULT
+
+    EXT -.->|"active on"| PG1
+    EXT -.->|"active on"| PG2
 ```
 
 ## Component Index
