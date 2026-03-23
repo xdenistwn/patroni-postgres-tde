@@ -21,18 +21,23 @@ graph LR
         PGB["PgBouncer\nport 6432\ntransaction pool mode"]
     end
 
-    subgraph "PostgreSQL HA Cluster"
+    subgraph "PostgreSQL + etcd Node 1"
         direction TB
         PG1["postgres-one\n(Patroni Leader)\nport 5432  Patroni API 8008"]
-        PG2["postgres-two\n(Patroni Replica)\nport 5432  Patroni API 8008"]
-        PG1 -- "Streaming Replication\nWAL shipping" --> PG2
+        E1["etcd1\nport 2379/2380\nmTLS"]
     end
 
-    subgraph "Distributed Configuration Store"
-        E1["etcd1\nport 2379/2380\nmTLS"]
+    subgraph "PostgreSQL + etcd Node 2"
+        direction TB
+        PG2["postgres-two\n(Patroni Replica)\nport 5432  Patroni API 8008"]
         E2["etcd2\nport 2379/2380\nmTLS"]
+    end
+
+    subgraph "etcd Witness Node"
         E3["etcd3\nport 2379/2380\nmTLS"]
     end
+
+    PG1 -- "Streaming Replication\nWAL shipping" --> PG2
 
     subgraph "Key Management"
         VAULT["HashiCorp Vault\nport 8200\nKV v2 — path: tde/\nAppRole auth"]
@@ -107,8 +112,8 @@ sequenceDiagram
 | PostgreSQL     | postgres-one/two | 5432       | TCP      | pg_hba: md5 all 0.0.0.0/0          |
 | PgBouncer      | postgres-one/two | 6432       | TCP      | transaction mode, md5 auth         |
 | Patroni REST   | postgres-one/two | 8008       | HTTP     | cluster status, switchover API     |
-| etcd client    | etcd1/2/3        | 2379       | HTTPS    | mTLS client + CA auth              |
-| etcd peer      | etcd1/2/3        | 2380       | HTTPS    | mTLS peer auth                     |
+| etcd client    | postgres-one/two, etcd3 | 2379       | HTTPS    | mTLS client + CA auth              |
+| etcd peer      | postgres-one/two, etcd3 | 2380       | HTTPS    | mTLS peer auth                     |
 | Vault          | vault            | 8200       | HTTP     | TLS disabled in dev/R&D mode       |
 | MinKMS         | minkms           | 7373       | HTTPS    | mTLS using custom CA               |
 | MinIO API      | minio            | 9000       | HTTPS    | S3-compatible                      |
