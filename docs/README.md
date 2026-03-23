@@ -16,14 +16,17 @@ graph TD
         PGB[PgBouncer :6432\nConnection Pool]
     end
 
-    subgraph HA Cluster
+    subgraph PostgreSQL + etcd Node 1
         PG1[postgres-one\nPatroni Leader\n:5432]
-        PG2[postgres-two\nPatroni Replica\n:5432]
+        E1[etcd1 :2379]
     end
 
-    subgraph Coordination
-        E1[etcd1 :2379]
+    subgraph PostgreSQL + etcd Node 2
+        PG2[postgres-two\nPatroni Replica\n:5432]
         E2[etcd2 :2379]
+    end
+
+    subgraph etcd Witness Node
         E3[etcd3 :2379]
     end
 
@@ -106,8 +109,8 @@ Runbooks for high-impact operational procedures (failover, backup/restore, key r
 | OS / Architecture     | RHEL 9 / aarch64 (arm64); x86_64 Dockerfile also provided       |
 | Deployment model      | Docker Compose (multi-container, external `pg_network`)          |
 | PostgreSQL version    | 18.1 (Percona Distribution)                                     |
-| HA topology           | 1 leader (`postgres-one`) + 1 replica (`postgres-two`)          |
-| DCS                   | etcd v3.5.16 — 3-node cluster (etcd1, etcd2, etcd3)             |
+| HA topology           | 1 leader (`postgres-one` + etcd1) + 1 replica (`postgres-two` + etcd2) |
+| DCS                   | etcd v3.5.16 — 3-node cluster (co-located etcd1/2, separate etcd3)  |
 | Encryption            | pg_tde with `tde_heap` access method; `default_table_access_method = tde_heap` |
 | Key provider          | HashiCorp Vault (KV v2 at path `tde/`)                          |
 | Connection pooler     | PgBouncer in `transaction` mode on port 6432                    |
