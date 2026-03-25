@@ -131,6 +131,13 @@ FROM cron.job_run_details
 ORDER BY start_time DESC
 LIMIT 10;
 
+-- Update job
+SELECT cron.alter_job(
+    job_id   => (SELECT jobid FROM cron.job WHERE jobname = 'partman-maintenance'),
+    schedule => '*/30 * * * *',
+    command => $$SELECT public.run_maintenance(p_analyze := false)$$
+);
+
 -- Pause a job (set active = false)
 UPDATE cron.job SET active = false WHERE jobname = 'partman-maintenance';
 

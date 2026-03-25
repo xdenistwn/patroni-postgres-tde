@@ -172,6 +172,8 @@ bootstrap:
 
 When `pg_partman` creates child partitions dynamically, earlier versions of pg_partman did not inherit the `default_table_access_method = tde_heap` set at the cluster level. Research task RC3-03 was opened to address this. The workaround is to use a partman **template table** with `USING tde_heap` specified, or to set `default_table_access_method` at the session level with `SET default_table_access_method = 'tde_heap';` before calling `create_parent()`.
 
+or make it tde_heap as default table access method from startup.
+
 Confirmed working approach (from `pg_repack_partman_tde_rnd.sample.sql`):
 ```sql
 SET default_table_access_method = 'tde_heap'; -- session level
@@ -180,7 +182,7 @@ CREATE TABLE bloat_test_part_tde (...) PARTITION BY RANGE (created_at);
 
 ### `pg_tde.wal_encrypt = off`
 
-WAL segments are not encrypted in this configuration. Data pages inside the heap are encrypted, but WAL replay material for non-encrypted tables will appear in plain text in WAL. If WAL encryption is later enabled, performance must be re-benchmarked.
+WAL segments are not encrypted at the WAL layer. This is intentional — pg_tde.wal_encrypt is disabled because pgBackRest does not support WAL-level encryption from pg_tde. Instead, WAL is protected through two complementary controls: encryption at rest via pgBackRest's built-in encryption for backup and WAL archive storage, and TLS for encryption in transit during WAL streaming and archive transfer. Data pages inside the heap remain encrypted via the tde_heap access method. If WAL encryption is later enabled, performance must be re-benchmarked.
 
 ### Ubuntu arm64 Build Limitations
 

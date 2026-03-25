@@ -57,6 +57,7 @@ parameters:
 run_sql "CREATE EXTENSION IF NOT EXISTS pg_tde;"
 
 # Register the Vault KV v2 provider
+# Please change the arguments based on your own setup
 run_sql "SELECT pg_tde_add_global_key_provider_vault_v2(
   'vault-provider',        -- name used in pg_tde
   'http://vault:8200',     -- Vault address
@@ -66,12 +67,14 @@ run_sql "SELECT pg_tde_add_global_key_provider_vault_v2(
 );"
 
 # Create a master key in Vault
+# Please change the arguments based on your own setup
 run_sql "SELECT pg_tde_create_key_using_global_key_provider(
   'global-master-key',
   'vault-provider'
 );"
 
 # Set it as the default for all databases
+# Please change the arguments based on your own setup
 run_sql "SELECT pg_tde_set_default_key_using_global_key_provider(
   'global-master-key',
   'vault-provider'
@@ -144,7 +147,7 @@ SELECT pg_tde_key_info();                    -- shows active key name + provider
 |-----------------|-----------------------------------------------------------------------------------------------|
 | HashiCorp Vault | pg_tde calls Vault KV v2 API to fetch and store the master key; token is file-based           |
 | PostgreSQL      | `tde_heap` is registered as an access method inside PostgreSQL's AM catalogue                 |
-| pg_partman      | Child partitions must explicitly use `tde_heap`; session-level `SET` is the current workaround |
+| pg_partman      | Child partitions automatically inherit `tde_heap` when set as the global default table access method |
 | pgBackRest      | Backups contain encrypted heap files; page-level encryption is preserved in backup files      |
 | pg_repack       | Repacks TDE tables by creating temporary tables with the same `tde_heap` AM                   |
 
@@ -152,13 +155,9 @@ SELECT pg_tde_key_info();                    -- shows active key name + provider
 
 ### Partition Children Default AM
 
-When `create_parent()` dynamically generates child partitions, they may default to `heap` rather than `tde_heap` even with `default_table_access_method = tde_heap` set globally. The R&D workaround confirmed to work is:
+Based on R&D findings, when `default_table_access_method = tde_heap` is configured globally, `pg_partman` automatically uses `tde_heap` instead of `heap` when dynamically generating child partitions with `create_parent()`. No session-level workaround is required.
 
-```sql
-SET default_table_access_method = 'tde_heap';  -- session level before create_parent()
-```
-
-And verified with:
+It can be verified with:
 
 ```sql
 SELECT relname, amname
@@ -171,7 +170,7 @@ ORDER BY relname;
 
 ### WAL Encryption Disabled
 
-`pg_tde.wal_encrypt = off` means WAL segments contain the changes to encrypted pages but in a form that reveals the *structure* of writes. For strict compliance scenarios that require WAL encryption, this must be enabled and performance re-evaluated.
+`pg_tde.wal_encrypt = off` means WAL segments contain the changes to encrypted pages but in a form that reveals the *structure* of writes. As a workaround for strict compliance scenarios, we use Server-Side Encryption (SSE) at the object storage service to protect WAL files at rest, and use TLS to secure them in transit, avoiding the performance overhead of native WAL encryption.
 
 ### Encryption Verification (OS-level)
 

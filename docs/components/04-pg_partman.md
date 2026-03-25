@@ -146,11 +146,11 @@ FROM generate_series(1, 500000);
 
 ### Child Partitions Not Inheriting `tde_heap` (RC3-03)
 
-The most significant finding in R&D: child partitions created by `create_parent()` would default to `heap` rather than `tde_heap` when inheriting the parent's attributes, even when `default_table_access_method = tde_heap` was set globally.
+The most significant finding in R&D: child partitions created by `create_parent()` would default to `heap` rather than `tde_heap` when inheriting the parent's attributes.
 
 **Root cause**: The `CREATE TABLE ... PARTITION OF` statement used internally by pg_partman did not always propagate the access method from the session-level default.
 
-**Workaround applied**: Issue `SET default_table_access_method = 'tde_heap'` at the session level immediately before calling `create_parent()`. Confirmed working by checking `pg_class.relam` after partition creation:
+**Workaround applied**: Issue `SET default_table_access_method = 'tde_heap'` at the session level immediately or `default_table_access_method = tde_heap` set as globally at patroni config before calling `create_parent()`. Confirmed working by checking `pg_class.relam` after partition creation:
 
 ```sql
 SELECT relname, amname
@@ -169,9 +169,8 @@ ORDER BY relname;
 PRIMARY KEY (id, created_at)   -- id alone would fail for a range-partitioned table
 ```
 
-### `pg_partman_bgw.interval` Not Set
-
-[TO BE CONFIRMED: check if `pg_partman_bgw.interval` or `pg_partman_bgw.dbname` is set in `patroni-one.yml` or `postgresql.conf`. Without this, the background worker runs with default interval and may not know which database to maintain.]
+### `pg_partman_bgw.interval` Not Set (use pg_cron instead)
+Use `pg_cron` instead because its better for flexibility, control, and running only in primary node.
 
 ## Operational Notes
 

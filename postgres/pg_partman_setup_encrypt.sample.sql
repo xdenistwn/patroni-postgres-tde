@@ -4,6 +4,8 @@
 
 -- 1. Create the pg_partman extension (pg_tde extension must be run first)
 CREATE EXTENSION IF NOT EXISTS pg_partman;
+CREATE EXTENSION IF NOT EXISTS pgstattuple;
+SET default_table_access_method = 'tde_heap';
 
 -- 2. create real table with the partition mode
 CREATE TABLE events_encrypted (
@@ -17,7 +19,7 @@ SELECT public.create_parent(
     p_parent_table  => 'public.events_encrypted',
     p_control       => 'created_at',
     p_interval      => '1 month',
-    p_premake       => 6
+    p_premake       => 2
 );
 
 -- 4. insert some sample data

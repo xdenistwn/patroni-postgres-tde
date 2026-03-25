@@ -167,10 +167,10 @@ Patroni's standard `pg_basebackup` method does not understand pg_tde's encrypted
 docker exec postgres-one patronictl -c /etc/patroni/patroni.yml list
 
 # Perform a manual switchover (graceful leader hand-off)
-docker exec postgres-one patronictl -c /etc/patroni/patroni.yml switchover --master postgres-one --candidate postgres-two --force
+docker exec postgres-one patronictl -c /etc/patroni/patroni.yml switchover --leader postgres-one --candidate postgres-two --force
 
 # Perform a manual failover (if leader is unhealthy)
-docker exec postgres-two patronictl -c /etc/patroni/patroni.yml failover --master postgres-one
+docker exec postgres-two patronictl -c /etc/patroni/patroni.yml failover --leader postgres-one
 
 # Restart PostgreSQL via Patroni (does not trigger failover)
 docker exec postgres-one patronictl -c /etc/patroni/patroni.yml restart postgres-cluster postgres-one

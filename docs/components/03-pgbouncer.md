@@ -19,6 +19,33 @@ graph LR
     PGB -->|"userlist.txt\nmd5 auth"| AUTH["userlist.txt\n/etc/pgbouncer/"]
 ```
 
+### Architecture Comparison
+
+```mermaid
+graph TD
+    subgraph "Without PgBouncer (Direct Connection)"
+        APP1["Client 1"] -->|port 5432| PG1[("PostgreSQL\n(Max Conn: 100)")]
+        APP2["Client 2"] -->|port 5432| PG1
+        APP3["Client 3"] -->|port 5432| PG1
+        APP4["Client N"] -.->|fails if > 100 clients| PG1
+    end
+
+    subgraph "With PgBouncer (Connection Pooling)"
+        APP5["Client 1"] -->|port 6432| PGB["PgBouncer\n(Max Clients: 500)"]
+        APP6["Client 2"] -->|port 6432| PGB
+        APP7["Client 3"] -->|port 6432| PGB
+        APP8["Client N"] -.->|port 6432| PGB
+        PGB == "Shared Persistent Pool\n(e.g. 75 conns)" ==> PG2[("PostgreSQL\n(Max Conn: 100)")]
+    end
+```
+
+### Direct Connection vs. PgBouncer
+
+| Approach | Scaling Behavior (e.g., 500 Clients vs 100 `max_connections`) | Pros | Cons |
+|----------|-----------------------------------------------------------------|------|------|
+| **Direct Connection**<br>(Without PgBouncer) | **Breaks Application:** Clients map 1:1 to PostgreSQL backend processes. The 101st application client receives a fatal `"sorry, too many clients already"` error and is rejected. | • Simple architecture, no extra moving parts<br>• Full support for prepared statements & all session-level features<br>• Slightly lower latency for establishing a single connection | • Hard limit on concurrent clients (`max_connections`)<br>• High CPU and memory overhead per connection request<br>• Vulnerable to connection spikes |
+| **Connection Pooling**<br>(With PgBouncer) | **Keeps Database Safe:** PgBouncer successfully holds all 500 application connections open, but multiplexes their transactions over a pool of (e.g., 75) real PostgreSQL connections. If all 75 are busy, PgBouncer safely queues the excess transactions in memory. PostgreSQL is completely shielded and never breaks. | • Supports thousands of concurrent application clients safely<br>• Significantly reduces PostgreSQL memory and CPU overhead<br>• Protects database from sudden connection storms | • An extra component to configure, monitor, and maintain<br>• `transaction` mode breaks session-level features (e.g. `SET`, `PREPARE`)<br>• Small query delay when clients wait for an available pool slot |
+
 ## Version & Distribution
 
 | Property        | Value                                                           |
@@ -112,11 +139,11 @@ exec "$@"   # start Patroni in foreground
 | Parameter               | Value Found | Effect                                                                    | Recommendation                            |
 |-------------------------|-------------|---------------------------------------------------------------------------|-------------------------------------------|
 | `pool_mode`             | transaction | Server connection released after each transaction, not session-end        | Best for stateless apps; avoid if using `SET` session-level |
-| `max_client_conn`       | 500         | Hard cap on simultaneous clients across all pools                         | Increase if application demands exceed 500 |
-| `default_pool_size`     | 75          | Number of real PG connections per pool; must be ≤ `max_connections - 3`  | Keep below PostgreSQL `max_connections`   |
+| `max_client_conn`       | 500         | The maximum number of incoming application clients PgBouncer will hold continuously open before rejecting them. | Must be scaled to handle peak application connection demands. |
+| `default_pool_size`     | 75          | The maximum number of physical backend connections PgBouncer makes to PostgreSQL to serve the 500 clients. | Keep safely below PostgreSQL's `max_connections` (e.g., `100 - 3`). |
 | `min_pool_size`         | 25          | Pre-warmed connections to reduce connection latency                       | Set to expected steady-state concurrency  |
 | `reserve_pool_size`     | 75          | Extra pool for burst above `default_pool_size`                            | Monitor `cl_waiting`; increase if > 0    |
-| `query_wait_timeout`    | 120         | Client returns error after 2 min waiting for a pool slot                  | Tune to application query time expectations |
+| `query_wait_timeout`    | 120         | When all 75 backend connections are busy, queued transactions wait a max of 2 mins for a free slot before erroring. | Tune to application tolerance for queued queries. |
 | `server_reset_query`    | DISCARD ALL | Clears session state between transactions                                 | Required in transaction mode              |
 | `auth_type`             | md5         | Password hashed with MD5; consider `scram-sha-256` for stronger auth     | Upgrade to SCRAM in production            |
 
@@ -131,11 +158,35 @@ exec "$@"   # start Patroni in foreground
 
 ## Known Issues & Research Findings
 
-### `DISCARD ALL` Incompatibility with Prepared Statements
+### Prepared Statements (`PREPARE` / `EXECUTE`) Issue
 
-`pool_mode = transaction` with `server_reset_query = DISCARD ALL` is incompatible with persistent prepared statements (protocol-level, not SQL-level). Applications using `PREPARE` / `EXECUTE` in the PostgreSQL extended query protocol must either:
-- Use `pool_mode = session` (less efficient), or
-- Use pgBouncer's `server_reset_query_always = 0` with `DEALLOCATE ALL` instead.
+When PgBouncer is in `transaction` mode, it runs a `DISCARD ALL` command to wipe the database connection cleanly after every single transaction. This ensures the connection is fresh and prevents data or settings from leaking between different clients sharing the pool.
+
+However, this "hard wipe" also deletes **Prepared Statements**—queries your application specifically asks the database to "remember" so it can run them faster later. Because PgBouncer wipes them out, your application will throw errors when it tries to use them again.
+
+If your application relies heavily on prepared statements, you have three options to fix this:
+1. **Switch to Session Pooling:** Change to `pool_mode = session`. This binds a client to a database connection for their entire session, allowing prepared statements to survive. The downside is it severely limits how many simultaneous clients PgBouncer can safely handle.
+2. **Use a Gentler Cleanup:** Keep the highly scalable `transaction` mode, but configure PgBouncer to perform a softer cleanup (such as tweaking `server_reset_query` and `server_reset_query_always`), so it stops wiping out the prepared statements.
+3. **Application-Side Fix (Laravel Example):** Keep `transaction` mode and simply tell your application framework to stop using server-side prepared statements. Instead, it will "emulate" them locally securely.
+
+   **Example for Laravel (`config/database.php`):**
+   ```php
+   'pgsql' => [
+       'driver'   => 'pgsql',
+       'host'     => env('DB_HOST', '127.0.0.1'),
+       'port'     => env('DB_PORT', '6432'), // Connect to PgBouncer port
+       'database' => env('DB_DATABASE', 'forge'),
+       'username' => env('DB_USERNAME', 'forge'),
+       'password' => env('DB_PASSWORD', ''),
+       // ... other settings ...
+       
+       'options'  => [
+           // This tells Laravel/PDO to emulate prepared statements locally, 
+           // bypassing the PgBouncer 'DISCARD ALL' wipe issue completely!
+           \PDO::ATTR_EMULATE_PREPARES => true,
+       ],
+   ],
+   ```
 
 ### PgBouncer Not HA-Aware
 
