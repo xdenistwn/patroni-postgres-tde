@@ -54,16 +54,29 @@ parameters:
 CREATE EXTENSION IF NOT EXISTS pgaudit;
 ```
 
-### Configuration Options (Runtime Defaults)
+### Configuration Options
 
-While not explicitly configured in `patroni-one.yml` yet, to fully implement pgAudit, you must configure the classes of statements you wish to audit globally or per-role. Examples of typical settings to place in `patroni-one.yml` or `patroni-two.yml`:
+pgAudit is explicitly configured in the Patroni configuration (`patroni-one.yml` / `patroni-two.yml`) within the PostgreSQL parameters section. The current settings applied to the cluster are:
 
-| Parameter                        | Example Value  | Description                                                                                                     |
-|----------------------------------|----------------|-----------------------------------------------------------------------------------------------------------------|
-| `pgaudit.log`                    | 'write, ddl'   | Tracks UPDATE/INSERT/DELETE (`write`) and all schema changes (`ddl`), ignoring pure SELECTs (`read`)           |
-| `pgaudit.role`                   | 'auditor'      | If set, pgAudit only logs activity on objects where the `auditor` role has permissions                           |
-| `pgaudit.log_catalog`            | off            | Prevents pgAudit from logging queries to system catalogs (like `pg_class`), reducing log noise                 |
-| `pgaudit.log_parameter`          | on             | Includes parameter values (the `$1`, `$2` in prepared statements) in the audit log                             |
+| Parameter               | Set Value | Description                                                                                                   |
+|-------------------------|-----------|---------------------------------------------------------------------------------------------------------------|
+| `pgaudit.log`           | `'all'`   | Logs absolutely every category of statement (`read`, `write`, `function`, `role`, `ddl`, `misc`).             |
+| `pgaudit.log_catalog`   | `off`     | Prevents pgAudit from logging queries to system catalogs (like `pg_class`), significantly reducing log noise. |
+| `pgaudit.log_client`    | `off`     | Specifies whether log messages will be visible to a client process such as psql. `off` means they only go to the server log. |
+| `pgaudit.log_level`     | `'log'`   | The log level to use for log entries (e.g., `log`, `info`, `notice`, `warning`).                              |
+
+## pgaudit.log Values
+ 
+| Value | Yang di-log |
+|---|---|
+| `read` | `SELECT`, `COPY` saat data dibaca dari tabel/sequence |
+| `write` | `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `COPY` saat data ditulis |
+| `function` | Pemanggilan function dan `DO` blocks |
+| `role` | `GRANT`, `REVOKE`, `CREATE/ALTER/DROP ROLE` |
+| `ddl` | Semua DDL kecuali yang masuk kategori `role` — `CREATE`, `ALTER`, `DROP` untuk object seperti table, index, dll |
+| `misc` | Perintah lain-lain seperti `DISCARD`, `FETCH`, `CHECKPOINT`, `VACUUM`, `SET` |
+| `misc_set` | Khusus perintah `SET` saja (subset dari `misc`) |
+| `all` | Semua kategori di atas |
 
 ## Integration Points
 
@@ -77,9 +90,9 @@ While not explicitly configured in `patroni-one.yml` yet, to fully implement pgA
 
 ### pgAudit Requires Specific Configuration
 
-Simply adding `pgaudit` to `shared_preload_libraries` makes it available, but it **does not log anything until configured**. [TO BE CONFIRMED: Currently, `pgaudit.log` is not set in `patroni-one.yml`. Meaning, pgAudit is loaded but effectively inert.]
+Simply adding `pgaudit` to `shared_preload_libraries` makes it available, but it **does not log anything until configured**. This is correctly handled in our environment.
 
-Recommendation for R&D/Production: Add `pgaudit.log = 'ddl, write, role'` to the PostgreSQL parameters section in Patroni configuration to capture schema changes, data modifications, and role assignments without flooding the logs with pure read queries.
+**Current Implementation**: The Patroni configuration explicitly injects `pgaudit.log = 'all'` along with catalog filters (`pgaudit.log_catalog: off`) and routing options (`pgaudit.log_client: off`). This successfully tracks all data modifications and schema changes.
 
 ### Log Volume
 
@@ -101,12 +114,27 @@ docker exec postgres-one psql -U postgres -c "SET pgaudit.log = 'write, ddl';"
 # Dynamically change what gets audited (system level - requires reload)
 docker exec postgres-one psql -U postgres -c "ALTER SYSTEM SET pgaudit.log = 'write, ddl'; SELECT pg_reload_conf();"
 
+# Change via patronictl rest api if you use patroni
+curl -s -XPATCH -H "Content-Type: application/json" -d '{
+  "postgresql": {
+    "parameters": {
+      "pgaudit.log": "write, ddl",
+      "pgaudit.log_catalog": "off",
+      "pgaudit.log_client": "off",
+      "pgaudit.log_level": "log"
+    }
+  }
+}' http://localhost:8008/config
+
+curl -s XPOST http://localhost:8008/reload
+
 # View the log entries
 docker exec postgres-one tail -f /data/db/log/postgresql-*.log | grep AUDIT
 ```
 
 ## Performance Considerations
 
+- **Production Configuration (`pgaudit.log`):** It is highly recommended **not** to use `pgaudit.log = 'all'` in production. Setting this value logs every single `SELECT` query (`read`), which will generate a massive volume of logs, degrade database performance, and consume storage rapidly. Instead, use `'write, ddl'` to only track data modifications and schema changes, or use role-based auditing (`pgaudit.role`) to strictly log the activity of specific sensitive accounts.
 - **Disk I/O**: Every audited statement adds physical write I/O to the logging disk. For a high-transaction system, this can become a bottleneck. Ensure the log volume is on fast storage.
 - **CPU**: The executor hook used by pgAudit adds negligible CPU overhead to query execution. The performance impact entirely comes from writing the log lines.
 - **Log Rotation**: If extensive auditing is enabled, ensure `log_rotation_age` and `log_rotation_size` in Patroni are strictly configured to prevent the log directory from consuming all local disk space.

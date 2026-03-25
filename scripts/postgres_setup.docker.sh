@@ -102,3 +102,8 @@ echo "--- Setting up pg_cron ---"
 echo "Creating extension pg_cron..."
 run_sql "CREATE EXTENSION IF NOT EXISTS pg_cron;"
 
+# -- 6. Setup pg_audit
+echo "--- Setting up pg_audit ---"
+echo "Creating extension pg_audit..."
+run_sql "CREATE EXTENSION IF NOT EXISTS pgaudit;"
+

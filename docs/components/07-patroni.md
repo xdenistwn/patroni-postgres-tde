@@ -63,6 +63,8 @@ etcd3:
   cert: /etc/postgres/certs/public.crt
   key: /etc/postgres/certs/private.key
 
+# only run once at startup and etcd dcs not filled, can be edited only via patronictl 'edit-config' or patroni rest api
+# effect all node in the cluster (must be sync)
 bootstrap:
   dcs:
     ttl: 30                          # leader lock TTL: if no heartbeat in 30s, failover
@@ -80,6 +82,8 @@ bootstrap:
     - host all all 0.0.0.0/0 md5
     - host all all ::0/0 md5
 
+# to change config after bootstraping, you use this section key to override the etcd dcs.
+# effect only this node
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: postgres-one:5432
@@ -123,6 +127,16 @@ postgresql:
   parameters:
     recovery_min_apply_delay: "30s"   # delay WAL apply on replica for accidental deletion protection
 ```
+
+### Bootstrap DCS vs Local PostgreSQL Parameters
+
+It is critical to understand the distinction between \`bootstrap.dcs.postgresql.parameters\` and \`postgresql.parameters\` in the Patroni configuration:
+
+- **\`bootstrap.dcs.postgresql.parameters\` (Global configuration)**:
+  This section is **only evaluated once** during the initial cluster bootstrap (when the etcd DCS is empty). Once the cluster is initialized, these parameters are stored centrally in etcd. **Updating the YAML file will have no effect** on these parameters after the initial startup. To modify them on a running cluster, you **must** use \`patronictl edit-config\` or the Patroni REST API. Changes made here apply automatically to all nodes in the cluster.
+
+- **\`postgresql.parameters\` (Local node override)**:
+  This section defines local settings specific to the node where the config file resides. Because you cannot simply change the YAML file for bootstrapped parameters, you can use this section to **override** the global DCS settings for this specific node. Modifying this block in the YAML and reloading/restarting Patroni will apply changes locally.
 
 ### Key Parameters Explained
 
