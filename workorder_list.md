@@ -1,48 +1,55 @@
-# Patroni PostgreSQL HA with TDE Work Order & Research Timeline
+# Patroni PostgreSQL HA with TDE - Master Work Order
 
-This document outlines the research phases and implementation tasks for the high-availability PostgreSQL cluster featuring Transparent Data Encryption (TDE), Partitioning, Archiving into Object Storage (MinIO Aistor, MinKMS), and Key Management integration.
+This document tracks the completed implementation phases for the high-availability PostgreSQL cluster featuring Transparent Data Encryption (TDE), automated MinIO/pgBackRest archiving, HashiCorp Vault KMS integration, and Disaster Recovery simulations.
 
-## Implementation Roadmap (Bi-Weekly Research Cycles)
+## Implementation Roadmap (01 Jan 2026 - 01 Mar 2026)
 
-### Research Cycle 1: Infrastructure & HA Foundation
-**Timeline:** 01 Jan 2026 - 14 Jan 2026
-**Focus:** Patroni, etcd, and PostgreSQL Core environment setup.
+---
 
-| Task ID | Component | Description | Status |
-|---|---|---|---|
-| RC1-01 | Patroni/PG Research | Research how Patroni manages PostgreSQL failover and leader election via etcd. | ⬜ Todo |
-| RC1-02 | etcd Foundation | Deploy and secure etcd cluster with TLS to serve as the Distributed Configuration Store (DCS). | ⬜ Todo |
-| RC1-03 | Custom Build | Research and prepare custom PostgreSQL 18.x build with required extensions. | ⬜ Todo |
+### Work Order 1: Core Key Management & Object Storage Foundation
+**Timeline:** 01 Jan 2026 - 20 Jan 2026  
+**Status:** ✅ Completed
 
-### Research Cycle 2: Security & KMS Deep-Dive
-**Timeline:** 15 Jan 2026 - 28 Jan 2026
-**Focus:** KMS integration, TLS security, and TDE initialization.
+**Focus Title:** Deploying Centralized KMS (Vault/MinKMS) and MinIO Archival Storage
+**MENU:** 
+**ACTION:** -
+**AFFECTED DOMAIN:** New PSS & DCS - Back End Project
+**DETAILS & IMPACT:**
+This phase established the foundational security and storage layers required before the database could even boot. 
+- **HashiCorp Vault ($VAULT):** Configured as the absolute master key provider. We implemented dynamic key generation and initialized the Transit Engine to act as an external seal for MinKMS. 
+- **MinKMS & MinIO:** We integrated MinKMS to securely seal-wrap its encryption keys into Vault. We then deployed MinIO AIStor, leveraging MinKMS to enforce Server-Side Encryption (SSE-KMS) on the `postgres-archive` S3 bucket.
+- **Impact:** All backups and encryption master keys are completely abstracted away from the physical database servers, securing the perimeter against host-level intrusions. 
 
-| Task ID | Component | Description | Status |
-|---|---|---|---|
-| RC2-01 | KMS / MinKMS | Research integration of HashiCorp Vault with MinKMS for master key management. | ⬜ Todo |
-| RC2-02 | pg_tde Setup | Research `pg_tde` extension functionality and its binding to external KMS providers. | ⬜ Todo |
-| RC2-03 | TLS Infrastructure | Establish the Root CA and generate internal certificates for secure inter-service communication. | ⬜ Todo |
-| RC2-04 | Service Binding | Integrate Patroni bootstrap with `pg_tde` so instances initialize with encryption enabled. | ⬜ Todo |
+---
 
-### Research Cycle 3: Storage & Data Management
-**Timeline:** 29 Jan 2026 - 11 Feb 2026
-**Focus:** MinIO Object Storage, Partitioning logic, and Backup strategies.
+### Work Order 2: High Availability Postgres Cluster & Transparent Data Encryption
+**Timeline:** 21 Jan 2026 - 10 Feb 2026  
+**Status:** ✅ Completed
 
-| Task ID | Component | Description | Status |
-|---|---|---|---|
-| RC3-01 | Object Storage | Stand up MinIO Aistor and configure S3 buckets for database archiving and storage. | ⬜ Todo |
-| RC3-02 | pg_partman | Research and implement `pg_partman` for managing large time-series data sets. | ⬜ Todo |
-| RC3-03 | TDE-Partition Fix | Resolve the "heap vs tde_heap" issue to ensure all new partitions inherit TDE access methods. | ⬜ Todo |
-| RC3-04 | Backup Strategy | Configure `pgBackRest` to leverage MinIO S3 for WAL and full database backups. | ⬜ Todo |
+**Focus Title:** Bootstrapping Patroni Leader Election, etcd DCS, and pg_tde Encryption
+**MENU:** 
+**ACTION:** -
+**AFFECTED DOMAIN:** New PSS & DCS - Back End Project
+**DETAILS & IMPACT:**
+With the storage layer active, we deployed the database compute layer across multiple instances. 
+- **etcd (DCS):** Spun up a 3-node, TLS-secured distributed configuration store (`etcd1`, `etcd2`, `etcd3`) to act as the absolute source of truth for the cluster state.
+- **Patroni & PostgreSQL 18:** Containerized Percona Distribution for PostgreSQL bound to Patroni. Patroni watches etcd via secure API calls to manage automated failover, lock acquisition, and dynamically edit `postgresql.conf` parameters without manual intervention.
+- **pg_tde & pg_partman:** Bound the Percona `pg_tde` extension directly to the Vault KV engine. We enforced the `tde_heap` default access method globally so that dynamically generated time-series partitions from `pg_partman` instantly inherit military-grade encryption-at-rest. Attached PgBouncer internally to handle high-concurrency connection pooling.
+- **Impact:** The system is now fault-tolerant. If `postgres-one` drops, Patroni immediately promotes `postgres-two`. The physical database files are mathematically unreadable without active network access to Vault.
 
-### Research Cycle 4: Chaos, Audit & Final Validation
-**Timeline:** 12 Feb 2026 - 25 Feb 2026
-**Focus:** Disaster Recovery validation, Security audits, and Performance benchmarking.
+---
 
-| Task ID | Component | Description | Status |
-|---|---|---|---|
-| RC4-01 | Failover Chaos | Execute forced failover tests and evaluate "Split-Brain" prevention and recovery time. | ⬜ Todo |
-| RC4-02 | Key Rotation | Implement and verify automated master key rotation without service interruption. | ⬜ Todo |
-| RC4-03 | Disk Audit | Verify data-at-rest encryption status using OS-level inspection of physical blocks. | ⬜ Todo |
-| RC4-04 | Benchmarking | Run performance benchmarks on encrypted vs. non-encrypted tables to measure overhead. | ⬜ Todo |
+### Work Order 3: Automated Disaster Recovery & PITR Automation
+**Timeline:** 11 Feb 2026 - 01 Mar 2026  
+**Status:** ✅ Completed
+
+**Focus Title:** Continuous WAL Archiving and Point-In-Time-Recovery (PITR) Simulations
+**MENU:** 
+**ACTION:** -
+**AFFECTED DOMAIN:** New PSS & DCS - Back End Project
+**DETAILS & IMPACT:**
+The final phase proved our ability to recover from disastrous human errors (e.g., heavily replicated `DROP TABLE` commands).
+- **pgBackRest Integration:** Attached pgBackRest natively into Patroni's replication lifecycle so highly encrypted Write-Ahead Logs (WAL) and fast basebackups are streamed directly to the MinIO SSE-KMS bucket.
+- **PITR Isolated Pipelines:** Engineered the `postgres/restore` Patroni scope. We developed a robust orchestration pipeline to spin up a completely isolated PostgreSQL node that securely contacts Vault, fetches the timeline history from pgBackRest/MinIO, and mathematically reconstructs the database up to a dynamically chosen microsecond. 
+- **Advanced Recovery Fixes:** Successfully diagnosed and bypassed PostgreSQL timeline branching paradoxes inside pgBackRest using `--target-timeline='current'` mathematical enforcement. Validated the data extraction and restoration back into the primary production environment via a customized `pg_dump` methodology to preserve vital sequences.
+- **Impact:** We can now infinitely time-travel backward up to the latest WAL flush without risking existing, live production data. Database administrators can salvage overwritten strings or dropped schema within minutes.
