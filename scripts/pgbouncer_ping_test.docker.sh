@@ -40,11 +40,11 @@ echo "=========================================="
 echo ""
 
 echo "--- postgres-one (port 6432) ---"
-PGPASSWORD="$PGPASSWORD" psql -h localhost -p 6432 -U "$PGUSER" -d pgbouncer -c "SHOW POOLS;" 2>/dev/null || echo "Could not retrieve pool status"
+docker exec postgres-one bash -c "PGPASSWORD=\"$PGPASSWORD\" psql -h localhost -p 6432 -U \"$PGUSER\" -d pgbouncer -c \"SHOW POOLS;\"" 2>/dev/null || echo "Could not retrieve pool status"
 
 echo ""
 echo "--- postgres-two (port 6433) ---"
-PGPASSWORD="$PGPASSWORD" psql -h localhost -p 6433 -U "$PGUSER" -d pgbouncer -c "SHOW POOLS;" 2>/dev/null || echo "Could not retrieve pool status"
+docker exec postgres-two bash -c "PGPASSWORD=\"$PGPASSWORD\" psql -h localhost -p 6432 -U \"$PGUSER\" -d pgbouncer -c \"SHOW POOLS;\"" 2>/dev/null || echo "Could not retrieve pool status"
 
 echo ""
 echo "=========================================="

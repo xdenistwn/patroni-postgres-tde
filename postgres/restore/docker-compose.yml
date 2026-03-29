@@ -1,0 +1,54 @@
+services:
+  # PostgreSQL Restore node with Patroni
+  postgres-restore:
+    image: postgres_patroni_tde:18.1-dev
+    container_name: postgres-restore
+    hostname: postgres-restore
+    environment:
+      - PATRONI_NAME=postgres-restore
+      - PATRONI_SCOPE=postgres-restore # Use a different scope for the restored cluster
+      - PATRONI_NAMESPACE=/db/
+      - PATRONI_ETCD3_HOSTS=etcd1:2379,etcd2:2379,etcd3:2379
+      - PATRONI_ETCD3_PROTOCOL=https
+      - PATRONI_ETCD3_CACERT=/etc/postgres/certs/ca.crt
+      - PATRONI_ETCD3_CERT=/etc/postgres/certs/public.crt
+      - PATRONI_ETCD3_KEY=/etc/postgres/certs/private.key
+      - PATRONI_RESTAPI_CONNECT_ADDRESS=postgres-restore:8008
+      - PATRONI_POSTGRESQL_CONNECT_ADDRESS=postgres-restore:5432
+      - PATRONI_POSTGRESQL_DATA_DIR=/data/db
+      - PATRONI_REPLICATION_USERNAME=${PATRONI_PG_REPLICATION_USERNAME}
+      - PATRONI_REPLICATION_PASSWORD=${PATRONI_PG_REPLICATION_PASSWORD}
+      - PATRONI_SUPERUSER_USERNAME=${PATRONI_PG_SUPERUSER}
+      - PATRONI_SUPERUSER_PASSWORD=${PATRONI_PG_PASSWORD}
+      # pg_tde configuration
+      - ENABLE_PG_TDE=1
+      - PG_TDE_KEY_PROVIDER=vault
+      # pgbackrest configuration
+      - PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf
+      - PGBACKREST_STANZA=postgres-patroni-tde
+      # timezone
+      - TZ=Asia/Jakarta
+    ports:
+      - "5434:5432" # Changed host port to avoid conflict
+      - "6434:6432"
+      - "8010:8008"
+    networks:
+      - pg_network
+    volumes:
+      - postgres_restore_data:/data/db
+      - ./patroni-restore.yml:/etc/patroni/patroni.yml
+      - ./certs:/etc/postgres/certs:ro
+      - ./vault_token.txt:/etc/postgresql/secrets/vault_token.txt:ro
+      - ./pgbackrest:/etc/pgbackrest
+    healthcheck:
+      test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  pg_network:
+    external: true
+
+volumes:
+  postgres_restore_data:

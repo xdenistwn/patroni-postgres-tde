@@ -36,7 +36,7 @@ APP_DEV_PASS=${DB_DEV_USER_PASSWORD}
 VAULT_PROVIDER_NAME="vault-provider"
 VAULT_ADDR=${VAULT_ADDR:-"http://vault:8200"}
 VAULT_MOUNT_PATH=${VAULT_MOUNT_PATH:-"pg_tde"}
-MASTER_KEY_NAME="global-master-key"
+MASTER_KEY_NAME="global-master-key-one"
 TOKEN_FILE_PATH="/etc/postgresql/secrets/vault_token.txt"
 
 # --- Pre-flight: verify Postgres is reachable on the target host ---
@@ -101,4 +101,9 @@ run_sql "CREATE EXTENSION IF NOT EXISTS pg_stat_monitor;"
 echo "--- Setting up pg_cron ---"
 echo "Creating extension pg_cron..."
 run_sql "CREATE EXTENSION IF NOT EXISTS pg_cron;"
+
+# -- 6. Setup pg_audit
+echo "--- Setting up pg_audit ---"
+echo "Creating extension pg_audit..."
+run_sql "CREATE EXTENSION IF NOT EXISTS pgaudit;"
 

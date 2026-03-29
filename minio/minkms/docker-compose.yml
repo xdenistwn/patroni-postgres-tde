@@ -3,6 +3,10 @@ services:
     image: quay.io/minio/aistor/minkms:latest
     container_name: minkms
     hostname: minkms
+    # MinKMS uses HashiCorp Vault transit engine to wrap/unwrap its root seal key.
+    # Vault must be running and unsealed before starting MinKMS.
+    external_links:
+      - vault
     networks:
       - pg_network
     ports:
@@ -13,8 +17,7 @@ services:
       - ./config.yaml:/etc/minkms/config.yaml
     environment:
       - TZ=Asia/Jakarta
-    env_file:
-      - minkms.env
+      - MINIO_KMS_VOLUME=/mnt/minio-kms
     command: ["server", "--config", "/etc/minkms/config.yaml", "/mnt/minio-kms"]
 
 volumes:

@@ -4,6 +4,7 @@
 
 -- 1. Create the pg_partman extension (pg_tde extension must be run first)
 CREATE EXTENSION IF NOT EXISTS pg_partman;
+CREATE EXTENSION IF NOT EXISTS pgstattuple;
 
 -- 2. create real table with the partition mode
 CREATE TABLE events (

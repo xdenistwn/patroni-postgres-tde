@@ -1,10 +1,10 @@
-scope: postgres-cluster
+scope: postgres-restore
 namespace: /db/
-name: postgres-two
+name: postgres-restore
 
 restapi:
   listen: 0.0.0.0:8008
-  connect_address: postgres-two:8008
+  connect_address: postgres-restore:8008
 
 etcd3:
   hosts:
@@ -16,8 +16,6 @@ etcd3:
   cert: /etc/postgres/certs/public.crt
   key: /etc/postgres/certs/private.key
 
-# only run once at startup and etcd dcs not filled, can be edited only via patronictl 'edit-config' or patroni rest api
-# effect all node in the cluster (must be sync)
 bootstrap:
   dcs:
     ttl: 30
@@ -42,7 +40,7 @@ bootstrap:
         min_wal_size: 1GB
         max_wal_size: 4GB
         shared_preload_libraries: "pg_tde, pg_partman_bgw, pg_stat_monitor, pg_cron, pgaudit"
-  
+      
         # Replication Settings
         wal_level: replica
         hot_standby: "on"
@@ -50,7 +48,7 @@ bootstrap:
         max_replication_slots: 10
         wal_keep_size: 1GB
         wal_log_hints: "on"
-  
+      
         # Logging
         logging_collector: "on"
         log_directory: "log"
@@ -64,35 +62,23 @@ bootstrap:
         pgaudit.log_catalog: off
         pgaudit.log_client: off
         pgaudit.log_level: 'log'
-        # logging pg_aduit
-        pgaudit.log: 'all'
-        pgaudit.log_catalog: off
-        pgaudit.log_client: off
-        pgaudit.log_level: 'log'
-  
+      
         # pg_tde
         pg_tde.wal_encrypt: "off"
         default_table_access_method: "tde_heap"
+      
+        # Archive mode MUST be off to prevent writing to the primary archive!
+        archive_mode: "off"
   
-        # Archive mode (enabled with pgBackRest)
-        archive_mode: "on"
-        archive_command: "pgbackrest --stanza=postgres-patroni-tde archive-push %p"
-  
-  initdb:
-    - encoding: UTF8
-    - data-checksums
-    - locale: en_US.UTF-8
+  # Custom bootstrap method via pgbackrest
+  method: pgbackrest
+  pgbackrest:
+    command: "/bin/bash -c \"pgbackrest --stanza=postgres-patroni-tde --type=time --target='2026-03-29 22:24:59.520559+07' --target-timeline='current' --target-action=promote restore\""
+    keep_existing_recovery_conf: true
 
-  pg_hba:
-    - host replication replicator 0.0.0.0/0 md5
-    - host all all 0.0.0.0/0 md5
-    - host all all ::0/0 md5
-
-# to change config after bootstraping, you use this section key to override the etcd dcs.
-# effect only this node
 postgresql:
   listen: 0.0.0.0:5432
-  connect_address: postgres-two:5432
+  connect_address: postgres-restore:5432
   data_dir: /data/db
   bin_dir: /usr/pgsql-18/bin
   pgpass: /tmp/pgpass
@@ -107,7 +93,6 @@ postgresql:
   
   parameters:
     unix_socket_directories: "/var/run/postgresql"
-    recovery_min_apply_delay: "30s"
   
   create_replica_methods:
     - tde_basebackup
@@ -117,6 +102,7 @@ postgresql:
     checkpoint: fast
     max-rate: 100M
 
+  # recovery_conf to fetch necessary WAL files until target time
   recovery_conf:
     restore_command: 'pgbackrest --stanza=postgres-patroni-tde archive-get %f "%p"'
 

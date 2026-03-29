@@ -16,6 +16,8 @@ etcd3:
   cert: /etc/postgres/certs/public.crt
   key: /etc/postgres/certs/private.key
 
+# only run once at startup and etcd dcs not filled, can be edited only via patronictl 'edit-config' or patroni rest api
+# effect all node in the cluster (must be sync)
 bootstrap:
   dcs:
     ttl: 30
@@ -39,6 +41,7 @@ bootstrap:
         work_mem: 2621kB
         min_wal_size: 1GB
         max_wal_size: 4GB
+        shared_preload_libraries: "pg_tde, pg_partman_bgw, pg_stat_monitor, pg_cron, pgaudit"
       
         # Replication Settings
         wal_level: replica
@@ -56,9 +59,13 @@ bootstrap:
         log_rotation_size: 100MB
         log_line_prefix: "%m [%p] %u@%d "
         log_timezone: "Asia/Jakarta"
+        # logging pg_aduit
+        pgaudit.log: 'all'
+        pgaudit.log_catalog: off
+        pgaudit.log_client: off
+        pgaudit.log_level: 'log'
       
-        # pg_tde and pg_partman extensions
-        shared_preload_libraries: "pg_tde, pg_partman_bgw, pg_stat_monitor, pg_cron, pgaudit"
+        # pg_tde
         pg_tde.wal_encrypt: "off"
         default_table_access_method: "tde_heap"
       
@@ -76,6 +83,8 @@ bootstrap:
     - host all all 0.0.0.0/0 md5
     - host all all ::0/0 md5
 
+# to change config after bootstraping, you use this section key to override the etcd dcs.
+# effect only this node
 postgresql:
   listen: 0.0.0.0:5432
   connect_address: postgres-one:5432
