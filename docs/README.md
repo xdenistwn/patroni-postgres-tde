@@ -89,6 +89,7 @@ graph TD
 |13 | pg_stat_monitor        | [13-pg_stat_monitor.md](components/13-pg_stat_monitor.md) | Query performance analytics         | PGDG — pg_stat_monitor_18     |
 |14 | pgAudit                | [14-pgaudit.md](components/14-pgaudit.md)         | Audit logging                               | postgresql-18-audit (PGDG)    |
 |15 | Prometheus / Grafana   | *Integration Pending*                             | Cluster status, logs, & telemetry monitoring| *Coming Soon*                 |
+|16 | PITR Simulation        | [pitr-simulation.md](operations/pitr-simulation.md) | Disaster recovery via isolated WAL replay   | Operational Runbook           |
 
 ## How to Read This Documentation
 
@@ -97,7 +98,12 @@ Each component file in `docs/components/` is structured with two layers:
 1. **Executive Summary & Why This Matters** — at the top of every file. Written in plain language for non-technical stakeholders; explains what the component does and why the organisation needs it, with a reference to relevant compliance frameworks where applicable.
 2. **Technical Detail sections** — follow the executive summary. These include actual configuration snippets lifted directly from the project files, key parameter explanations, integration points with other components, known issues discovered during R&D, and operational notes (health checks, diagnostic queries).
 
-Runbooks for high-impact operational procedures (failover, backup/restore, key rotation) are in `docs/operations/`. The most important starting point for a fresh environment is [cluster-setup-order.md](operations/cluster-setup-order.md) — it documents the exact service startup order (Vault → MinKMS → MinIO → etcd → PostgreSQL primary → replica) with all required post-start configuration steps. Performance benchmark reference data is in `docs/benchmarks/`.
+Runbooks for high-impact operational procedures (failover, backup/restore, key rotation, PITR) are located in `docs/operations/`:
+
+- **[Cluster Setup Order](operations/cluster-setup-order.md)** — The most important starting point for a fresh environment. It documents the exact service startup order (Vault → MinKMS → MinIO → etcd → PostgreSQL) and mandatory post-start configurations.
+- **[Point-In-Time-Recovery (PITR) Simulation](operations/pitr-simulation.md)** — A rigorous procedural workflow proving how to safely recover an accidentally dropped table natively via pgBackRest WAL replay using an isolated Patroni container.
+
+Performance benchmark reference data is in `docs/benchmarks/`.
 
 ## Environment Summary
 
