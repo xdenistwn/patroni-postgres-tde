@@ -1,0 +1,13 @@
+1. Download minkms tools via cli
+2. export MINIO_KMS_ENDPOINT=http://localhost:7373
+export MINIO_KMS_API_KEY=k1:VALUE
+minkms stat -k
+
+3. create enclave
+minkms add-enclave -k postgres-archive-demo
+
+4. add identity for minio aistor
+minkms add-identity -k --enclave postgres-archive-demo --admin
+
+5. get api key for minio aistor
+minkms get-identity -k --enclave postgres-archive-demo --admin

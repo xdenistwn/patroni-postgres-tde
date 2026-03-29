@@ -64,7 +64,7 @@ graph TD
     PG2 -->|"archive-get"| MINIO
 
     MINIO -->|"SSE-KMS"| MINKMS
-    MINKMS -.->|"wraps key"| VAULT
+    MINKMS -->|"Transit seal-wrap\n(startup only)"| VAULT
 
     EXT -.->|"active on"| PG1
     EXT -.->|"active on"| PG2
@@ -88,6 +88,7 @@ graph TD
 |12 | pgBackRest             | [12-pgbackrest.md](components/12-pgbackrest.md)   | Backup & Point-In-Time Recovery             | percona-pgbackrest            |
 |13 | pg_stat_monitor        | [13-pg_stat_monitor.md](components/13-pg_stat_monitor.md) | Query performance analytics         | PGDG — pg_stat_monitor_18     |
 |14 | pgAudit                | [14-pgaudit.md](components/14-pgaudit.md)         | Audit logging                               | postgresql-18-audit (PGDG)    |
+|15 | Prometheus / Grafana   | *Integration Pending*                             | Cluster status, logs, & telemetry monitoring| *Coming Soon*                 |
 
 ## How to Read This Documentation
 
@@ -96,7 +97,7 @@ Each component file in `docs/components/` is structured with two layers:
 1. **Executive Summary & Why This Matters** — at the top of every file. Written in plain language for non-technical stakeholders; explains what the component does and why the organisation needs it, with a reference to relevant compliance frameworks where applicable.
 2. **Technical Detail sections** — follow the executive summary. These include actual configuration snippets lifted directly from the project files, key parameter explanations, integration points with other components, known issues discovered during R&D, and operational notes (health checks, diagnostic queries).
 
-Runbooks for high-impact operational procedures (failover, backup/restore, key rotation) are in `docs/operations/`. Performance benchmark reference data is in `docs/benchmarks/`.
+Runbooks for high-impact operational procedures (failover, backup/restore, key rotation) are in `docs/operations/`. The most important starting point for a fresh environment is [cluster-setup-order.md](operations/cluster-setup-order.md) — it documents the exact service startup order (Vault → MinKMS → MinIO → etcd → PostgreSQL primary → replica) with all required post-start configuration steps. Performance benchmark reference data is in `docs/benchmarks/`.
 
 ## Environment Summary
 
@@ -108,7 +109,7 @@ Runbooks for high-impact operational procedures (failover, backup/restore, key r
 | HA topology           | 1 leader (`postgres-one` + etcd1) + 1 replica (`postgres-two` + etcd2) |
 | DCS                   | etcd v3.5.16 — 3-node cluster (co-located etcd1/2, separate etcd3)  |
 | Encryption            | pg_tde with `tde_heap` access method; `default_table_access_method = tde_heap` |
-| Key provider          | HashiCorp Vault (KV v2 at path `tde/`)                          |
+| Key provider          | HashiCorp Vault — KV v2 (`pg_tde/`) for pg_tde; Transit engine for MinKMS seal-wrap |
 | Connection pooler     | PgBouncer in `transaction` mode on port 6432                    |
 | Backup repository     | MinIO AIStor (S3-compatible), bucket `postgres-archive`         |
 | WAL archiving         | Enabled; `archive_command` uses pgBackRest                      |

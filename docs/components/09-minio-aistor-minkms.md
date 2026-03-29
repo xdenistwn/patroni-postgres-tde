@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-MinIO AIStor is an enterprise-grade object storage system compatible with Amazon S3's API. In this stack, it serves as the backup repository where PostgreSQL's WAL segments and base backups are stored by pgBackRest. In addition to storage, MinIO is configured with Server-Side Encryption (SSE-KMS), meaning every object written to a bucket is automatically encrypted using keys managed by MinKMS — MinIO's own Key Management Server.
+MinIO AIStor is an enterprise-grade object storage system compatible with Amazon S3's API. In this stack, it serves as the backup repository where PostgreSQL's WAL segments and base backups are stored by pgBackRest. Every object written to MinIO is automatically encrypted with Server-Side Encryption (SSE-KMS), using keys managed by MinKMS.
 
-MinKMS is a lightweight KMS specifically designed for MinIO. It receives encryption and decryption requests from MinIO, manages encryption keys internally, and in this stack is further secured by a hardware-style master key. Together, MinIO AIStor and MinKMS ensure that backup data at rest is encrypted independently of the PostgreSQL-level pg_tde encryption, providing a defence-in-depth posture.
+MinKMS is MinIO's dedicated Key Management Server. It manages encryption keys in isolated **enclaves** (logical namespaces) and wraps its own root seal key using **HashiCorp Vault's Transit secret engine** — meaning MinKMS's master key never exists in plaintext on disk. Together, MinIO AIStor + MinKMS + Vault provide a layered defence-in-depth: object storage encryption (SSE-KMS) on top of the PostgreSQL-level pg_tde encryption.
 
 ## Why This Matters (Business / Compliance Context)
 
@@ -20,10 +20,9 @@ Storing unencrypted database backups in object storage is a significant complian
 
 ```mermaid
 graph TD
-    PGBR["pgBackRest\n(inside PostgreSQL container)"] -->|"archive-push WAL\nbase backup\nS3 path-style TLS"| MINIO["MinIO AIStor\nport 9000\nbucket: postgres-archive"]
-    MINIO -->|"SSE-KMS key request\nhttps :7373"| MINKMS["MinKMS\nport 7373"]
-    MINKMS -->|"wraps object key\nwith master key\n(HSM AES-256)"| HSM["Master key\nMINIO_KMS_HSM_KEY\n(env var)"]
-    MINKMS -.->|"optional: wrap master key\nwith Vault transit"| VAULT["HashiCorp Vault\n(not yet wired in this config)"]
+    PGBR["pgBackRest\ninside PostgreSQL containers"] -->|"archive-push WAL / base backup\nS3 path-style HTTPS"| MINIO
+    MINIO["MinIO AIStor\nport 9000 API / 9001 Console\nbucket: postgres-archive\nSSE-KMS enabled"] -->|"DEK request per object\nhttps://minkms:7373"| MINKMS
+    MINKMS["MinKMS\nport 7373\nenclave: postgres-archive-demo\nkey: ggwp-key-1"] -->|"Transit seal-wrap\nminkms-role AppRole\nstartup only"| VAULT["HashiCorp Vault\nport 8200"]
 ```
 
 ## Version & Distribution
@@ -66,6 +65,8 @@ services:
       retries: 3
 ```
 
+> **Note:** `MINIO_KMS_API_KEY` is the **client** API key for the `postgres-archive-demo` enclave (prefix `k2:`). This is different from the MinKMS **server** API key (prefix `k1:`) shown in MinKMS logs. See the enclave setup section below.
+
 ### MinKMS (`minio/minkms/docker-compose.yml`)
 
 ```yaml
@@ -74,33 +75,42 @@ services:
     image: quay.io/minio/aistor/minkms:latest
     container_name: minkms
     hostname: minkms
+    # Vault must be running and unsealed before MinKMS starts
+    external_links:
+      - vault
     ports:
       - "7373:7373"     # KMS API (HTTPS)
     volumes:
-      - minkms_data:/mnt/minio-kms       # KMS key store
-      - ./certs:/etc/minkms/certs        # TLS certs for MinKMS HTTPS
+      - minkms_data:/mnt/minio-kms
+      - ./certs:/etc/minkms/certs
       - ./config.yaml:/etc/minkms/config.yaml
-    env_file:
-      - minkms.env
+    environment:
+      - TZ=Asia/Jakarta
+      - MINIO_KMS_VOLUME=/mnt/minio-kms
     command: ["server", "--config", "/etc/minkms/config.yaml", "/mnt/minio-kms"]
 ```
 
-### MinKMS TLS Configuration (`minio/minkms/config.yaml`)
+### MinKMS Full Configuration (`minio/minkms/config.yaml`)
 
 ```yaml
 version: v1
 tls:
   certs:
-    - key: /etc/minkms/certs/private.key
-      cert: /etc/minkms/certs/public.crt
-```
+  - key: /etc/minkms/certs/private.key
+    cert: /etc/minkms/certs/public.crt
 
-### MinKMS Master Key (`minio/minkms/minkms.env`)
-
-```bash
-# AES-256 HSM-style master key used to wrap all MinKMS object encryption keys
-MINIO_KMS_HSM_KEY=hsm:aes256:wSyobDalkj3Qf08u2lKktXxyEru6RXiFGFdkOSQZ0ms=
-MINIO_KMS_VOLUME=/mnt/minio-kms
+# HSM: root seal key is wrapped/unwrapped by Vault Transit at startup only.
+# MinKMS cannot start if Vault is sealed or unreachable.
+hsm:
+  hashicorp:
+    vault:
+      server: "http://vault:8200"
+      approle:
+        id: "<role_id>"       # from: vault read auth/approle/role/minkms-role/role-id
+        secret: "<secret_id>" # from: vault write -f auth/approle/role/minkms-role/secret-id
+      transit:
+        engine: "transit"
+        key: "minkms-sealing-key"
 ```
 
 ### pgBackRest Bucket Policy (`minio/pgbackrest-policy.json`)
@@ -123,14 +133,59 @@ MINIO_KMS_VOLUME=/mnt/minio-kms
 }
 ```
 
-### MinIO Bucket Setup References
+### MinKMS Enclave Setup (`minio/minkms/setup_enclave.txt`)
+
+After MinKMS starts, create the enclave and SSE key that MinIO AIStor will use. Requires the `minkms` CLI binary (download from MinIO) or run via `docker run`.
 
 ```bash
-# See minio/setup_bucket.md for the full step-by-step bucket creation:
-# 1. Create access key 'pgbackrest' in MinIO Console
-# 2. Create bucket 'postgres-archive'
-# 3. Apply pgbackrest-policy.json to the pgbackrest access key
+# Use the server API Key shown in MinKMS startup logs (k1:...)
+export MINIO_KMS_SERVER=https://localhost:7373
+export MINIO_KMS_API_KEY=k1:<server_api_key_from_logs>
+
+# 1. Verify MinKMS is reachable
+minkms stat -k
+
+# 2. Create the enclave (logical namespace for this MinIO instance)
+minkms add-enclave -k postgres-archive-demo
+
+# 3. Create an admin identity for MinIO AIStor inside the enclave
+minkms add-identity -k --enclave postgres-archive-demo --admin
+
+# 4. Get the client API Key for MinIO AIStor (k2:... prefix)
+minkms get-identity -k --enclave postgres-archive-demo --admin
+# → Copy this k2:... value → set as MINIO_KMS_API_KEY in minio/aistor/docker-compose.yml
+
+# 5. Create the SSE key used for object encryption
+minkms keygen --insecure --enclave postgres-archive-demo ggwp-key-1
+# → Set MINIO_KMS_SSE_KEY=ggwp-key-1 in minio/aistor/docker-compose.yml
 ```
+
+After updating docker-compose.yml, restart MinIO:
+```bash
+make down-minio && make up-minio
+```
+
+### pgBackRest Bucket Setup (`minio/setup_bucket.md`)
+
+```bash
+# Connect mc client to MinIO
+mc alias set myminio https://localhost:9000 minioadmin minioadmin --insecure
+
+# Create the backup bucket
+mc mb myminio/postgres-archive --insecure
+mc anonymous set none myminio/postgres-archive --insecure
+
+# Create pgbackrest user + policy
+mc admin user add myminio pgbackrest <password> --insecure
+mc admin policy create myminio pgbackrest-policy minio/pgbackrest-policy.json --insecure
+mc admin policy attach myminio pgbackrest-policy --user=pgbackrest --insecure
+
+# Verify
+mc admin user list myminio --insecure
+# Expected: enabled  pgbackrest  pgbackrest-policy
+```
+
+See `minio/setup_bucket.md` for full step-by-step with expected output.
 
 ### Key Parameters Explained
 
@@ -145,13 +200,13 @@ MINIO_KMS_VOLUME=/mnt/minio-kms
 
 ## Integration Points
 
-| Component     | Integration                                                                                        |
-|---------------|----------------------------------------------------------------------------------------------------|
-| pgBackRest    | Pushes WAL and base backups to bucket `postgres-archive` via S3 API (path-style)                   |
-| MinKMS        | MinIO calls MinKMS for every object write/read to perform SSE-KMS encryption                       |
-| HashiCorp Vault | [TO BE CONFIRMED: MinKMS → Vault wiring not found in config files; currently using local HSM key] |
-| TLS Certs     | MinIO and MinKMS each have their own TLS certs generated from the same Root CA                     |
-| pg_network    | All containers on external Docker bridge `pg_network` for container hostname DNS resolution         |
+| Component        | Integration                                                                                              |
+|------------------|----------------------------------------------------------------------------------------------------------|
+| pgBackRest       | Pushes WAL and base backups to `postgres-archive` bucket via S3 path-style HTTPS                         |
+| MinKMS           | MinIO calls MinKMS for every object write/read to perform SSE-KMS encryption (`ggwp-key-1` in enclave `postgres-archive-demo`) |
+| **HashiCorp Vault** | **Implemented** — MinKMS authenticates via AppRole `minkms-role` at startup; Vault Transit wraps the MinKMS root seal key |
+| TLS Certs        | MinIO and MinKMS each have their own self-signed TLS certs (shared Root CA)                               |
+| pg_network       | All containers on external Docker bridge `pg_network` for hostname DNS resolution                         |
 
 ## Known Issues & Research Findings
 
@@ -163,13 +218,35 @@ MINIO_KMS_VOLUME=/mnt/minio-kms
 
 pgBackRest's `pgbackrest.conf` includes `repo1-storage-verify-tls=n`, which disables TLS certificate verification for the S3 connection to MinIO. This was used in R&D because MinIO uses a self-signed certificate. In production, set `repo1-storage-ca-file=/etc/postgres/certs/ca.crt` and remove the `verify-tls=n` line.
 
-### MinKMS → Vault Integration Not Yet Wired
+### MinKMS Startup Depends on Vault
 
-The `config.yaml` for MinKMS only defines TLS settings. The Vault-backed master key integration (where MinKMS would use Vault Transit to wrap its internal keys) is not yet configured in this R&D environment. All MinKMS keys are currently protected by the `MINIO_KMS_HSM_KEY` AES-256 key stored as an environment variable — this should be moved to Vault or an HSM for production.
+MinKMS uses Vault Transit to unseal its root key at startup. If Vault is sealed or unreachable when MinKMS starts, MinKMS will fail to start. The required startup order is: **Vault (unsealed) → MinKMS → MinIO AIStor**. Once MinKMS is running, Vault can go down without affecting ongoing object encryption/decryption (the root key is in memory). See `docs/operations/cluster-setup-order.md`.
 
-### Key Rotation for MinIO Objects
+### MinKMS API Key Changes After Re-seal
 
-Research Cycle 2 (RC2-01, RC2-02) focused on key rotation. After rotating the `MINIO_KMS_SSE_KEY`, existing objects retain their old DEK (which is wrapped with the old master key). To re-encrypt existing objects with the new key, MinIO provides a `mc admin heal` operation or `mc encrypt` re-encryption. See `docs/operations/key-rotation-runbook.md` for the procedure.
+After rotating the Vault Transit key and restarting MinKMS, MinKMS generates a **new server API Key** (`k1:...`). The client API Key for MinIO (`k2:...`, scoped to the enclave) does **not** change automatically. Only the server identity key changes. Verify via `make logs-minkms | grep 'API Key'`.
+
+### Key Rotation for MinIO Objects (Vault vs. MinKMS)
+
+It is crucial to understand the distinct rotation mechanisms in this stack:
+
+1. **Vault Transit Key Rotation (`minkms-sealing-key`)**: 
+   - Rotating this key *only* re-wraps the MinKMS root seal key upon the next MinKMS restart.
+   - It **does not** re-encrypt existing WAL or backup objects in MinIO.
+
+2. **MinKMS Enclave Key Rotation (e.g., `ggwp-key-1`)**:
+   - Rotating the active SSE Key creates a new key version inside MinKMS.
+   - New objects written by pgBackRest will have their per-object DEKs wrapped by the *new* key version.
+   - **Existing objects are untouched.** Their DEKs remain wrapped by the *old* key version.
+
+**Re-encrypting Existing Data:**
+To strictly re-encrypt existing data (so old key versions can be destroyed), you must execute:
+`mc admin heal myminio/postgres-archive --recursive --insecure`
+
+This process is highly efficient on storage I/O because it **only re-wraps the object metadata** (the encrypted DEK) and does not read or rewrite the actual 1TB backup payload. However, because it issues two API calls to MinKMS per object, healing a bucket with tens of thousands of WAL segments can incur heavy network and MinKMS CPU overhead.
+
+**Operational Recommendation:**
+Instead of running expensive healing operations across the whole bucket, align your KMS rotation schedule with your pgBackRest retention policy. For instance, if old backups and WAL segments expire after 30 days, a 90-day KMS key rotation naturally ages out all data encrypted by the old key. Once pgBackRest retention purges all objects using the old key version, the old KMS key version can be safely destroyed without ever needing to "heal" the bucket.
 
 ## Operational Notes
 

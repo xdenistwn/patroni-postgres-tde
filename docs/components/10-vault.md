@@ -2,9 +2,12 @@
 
 ## Executive Summary
 
-HashiCorp Vault is a purpose-built secrets management system that stores, generates, and controls access to sensitive data such as encryption keys, API tokens, and certificates. In this stack, Vault has two primary roles: (1) it is the **key provider for pg_tde**, storing the PostgreSQL master encryption key that protects all data at rest, and (2) it mints **short-lived tokens** for other services (PostgreSQL, pgBackRest) so they can authenticate to Vault without storing long-lived passwords.
+HashiCorp Vault is a purpose-built secrets management system that stores, generates, and controls access to sensitive data such as encryption keys, API tokens, and certificates. In this stack, Vault serves **two distinct roles**:
 
-Vault uses the AppRole authentication method, which is designed for machine-to-machine authentication. Each service gets its own role with minimal required permissions — a PostgreSQL node can only read and write encryption keys, nothing else.
+1. **KV v2 key provider for `pg_tde`** — stores the PostgreSQL master encryption key and issues tokens to each PostgreSQL node so pg_tde can fetch its key at startup.
+2. **Transit seal backend for MinKMS** — wraps and unwraps the MinKMS root seal key using Vault's Transit secret engine and AppRole authentication. MinKMS cannot start unless Vault is running and unsealed.
+
+Vault uses the **AppRole** authentication method for machine-to-machine authentication. Two separate AppRoles exist: `tde-role` (for PostgreSQL) and `minkms-role` (for MinKMS), each with the minimum required permissions.
 
 ## Why This Matters (Business / Compliance Context)
 
@@ -21,11 +24,22 @@ Storing encryption keys alongside the encrypted data is a fundamental security a
 
 ```mermaid
 graph TD
-    PG["PostgreSQL 18\n(pg_tde extension)"] -->|"token from\n/etc/postgresql/secrets/vault_token.txt"| VAULT["HashiCorp Vault\nport 8200\nKV v2 path: tde/"]
-    VAULT -->|"returns master key"| PGTDE["pg_tde\nglobal-master-key"]
-    PGBR["pgBackRest"] -->|"separate token\n(pgbackrest-policy)"| VAULT
-    INIT["vault-init.sh\n(init container / manual)"] -->|"enables secrets + policy\ncreates AppRole + tokens"| VAULT
-    MINKMS["MinKMS"] -.->|"future: Vault Transit\nfor HSM key wrapping"| VAULT
+    VAULT["HashiCorp Vault\nport 8200"]
+
+    subgraph KV["KV v2 — pg_tde path"]
+        KVSEC["pg_tde/data/global-master-key-one"]
+    end
+
+    subgraph TRANSIT["Transit Engine — minkms-sealing-key"]
+        TKEY["AES-256-GCM96 wrapping key"]
+    end
+
+    PG["PostgreSQL 18\n(pg_tde extension)"] -->|"vault_token.txt\ntde-role AppRole token"| VAULT
+    VAULT --> KV
+    MINKMS["MinIO MinKMS\nport 7373"] -->|"minkms-role AppRole\nstartup only"| VAULT
+    VAULT --> TRANSIT
+    MINIO["MinIO AIStor\nport 9000"] -->|"SSE-KMS DEK requests"| MINKMS
+    INIT["Operator / Init Script"] -->|"enables engines\ncreates policies + AppRoles"| VAULT
 ```
 
 ## Version & Distribution
@@ -75,49 +89,19 @@ services:
     command: server
 ```
 
-### Vault Initialisation Script (`vault/custom/vault-init.sh`)
+### Part A — pg_tde Setup (`vault/custom/setup_postgres_tde.txt`)
+
+Run inside the vault container after unsealing:
 
 ```bash
-#!/bin/sh
-export VAULT_ADDR="http://vault:8200"
+docker exec -it vault sh
+export VAULT_TOKEN=<root_token>   # from vault/custom/vault-seal.json
+export VAULT_SKIP_VERIFY=true
 
-# 1. Enable KV v2 secret engine at path 'tde'
-vault secrets enable -path=tde -version=2 kv
-
-# 2. Write the pg_tde access policy
-vault policy write pg_tde-policy - <<EOF
-path "pg_tde/data/*" {
-  capabilities = ["read", "create", "update", "list"]
-}
-path "pg_tde/metadata/*" {
-  capabilities = ["read", "list"]
-}
-path "sys/mounts/*" {
-  capabilities = ["read"]
-}
-EOF
-
-# 3. Enable AppRole authentication
-vault auth enable approle
-vault write auth/approle/role/tde-role policies="tde-policy"
-
-# 4. Generate a token for PostgreSQL's pg_tde extension
-TDE_TOKEN=$(vault token create -policy="tde-policy" -field=token)
-echo "$TDE_TOKEN" > /vault/secrets/vault_token.txt
-chmod 600 /vault/secrets/vault_token.txt
-
-# 5. Generate a separate token for pgBackRest
-PGBACKREST_TOKEN=$(vault token create -policy="pgbackrest-policy" -field=token)
-echo "$PGBACKREST_TOKEN" > /vault/secrets/pgbackrest_vault_token.txt
-chmod 600 /vault/secrets/pgbackrest_vault_token.txt
-```
-
-### Manual Setup Steps (`vault/custom/setup_postgres_tde.txt`)
-
-```bash
-# Step-by-step for interactive setup
+# 1. Enable KV v2 secret engine for pg_tde
 vault secrets enable -path=pg_tde -version=2 kv
 
+# 2. Create pg_tde access policy
 vault policy write pg_tde-policy - <<EOF
 path "pg_tde/data/*" {
   capabilities = ["read", "create", "update", "list"]
@@ -130,12 +114,61 @@ path "sys/mounts/*" {
 }
 EOF
 
+# 3. Enable AppRole auth (run once per Vault instance)
 vault auth enable approle
+
+# 4. Create AppRole for pg_tde
 vault write auth/approle/role/tde-role policies="pg_tde-policy"
 
-# Generate a long-lived token (1 year)
+# 5. Generate a long-lived token for PostgreSQL nodes (paste into vault_token.txt on each node)
 vault token create -policy="pg_tde-policy" -ttl=8760h -field=token
-# Example output: hvs.CAESIN_Yz7OUPKM6Nv6QuDCf8z4ot91QoCPx72BXn5z5u...
+# Copy token → postgres/master/vault_token.txt + postgres/replica_one/vault_token.txt
+```
+
+### Part B — MinKMS Transit Setup (`vault/custom/setup_minkms_vault.txt`)
+
+Continue inside the vault container:
+
+```bash
+# 1. Enable Transit secret engine
+vault secrets enable transit
+
+# 2. Create the MinKMS sealing key (AES-256-GCM96)
+vault write -f transit/keys/minkms-sealing-key
+
+# 3. Create MinKMS policy
+vault policy write minkms-policy - <<EOF
+path "transit/encrypt/minkms-sealing-key"  { capabilities = ["create", "update"] }
+path "transit/decrypt/minkms-sealing-key"  { capabilities = ["create", "update"] }
+path "transit/hmac/minkms-sealing-key"     { capabilities = ["create", "update"] }
+path "transit/sign/minkms-sealing-key"     { capabilities = ["create", "update"] }
+path "transit/verify/minkms-sealing-key"   { capabilities = ["create", "update"] }
+path "transit/keys/minkms-sealing-key"     { capabilities = ["read", "create", "update"] }
+EOF
+
+# 4. Create AppRole for MinKMS
+vault write auth/approle/role/minkms-role policies="minkms-policy"
+
+# 5. Retrieve credentials → paste into minio/minkms/config.yaml
+ROLE_ID=$(vault read -field=role_id auth/approle/role/minkms-role/role-id)
+SECRET_ID=$(vault write -f -field=secret_id auth/approle/role/minkms-role/secret-id)
+echo "Role ID:   $ROLE_ID"
+echo "Secret ID: $SECRET_ID"
+```
+
+Paste the output into `minio/minkms/config.yaml`:
+
+```yaml
+hsm:
+  hashicorp:
+    vault:
+      server: "http://vault:8200"
+      approle:
+        id: "<ROLE_ID>"
+        secret: "<SECRET_ID>"
+      transit:
+        engine: "transit"
+        key: "minkms-sealing-key"
 ```
 
 ### Key Parameters Explained
@@ -152,30 +185,34 @@ vault token create -policy="pg_tde-policy" -ttl=8760h -field=token
 
 ## Integration Points
 
-| Component     | Integration                                                                                     |
-|---------------|-------------------------------------------------------------------------------------------------|
-| pg_tde        | Reads Vault token from file; calls KV v2 API to store and retrieve the master encryption key    |
-| pgBackRest    | Separate Vault token (`pgbackrest-policy`) for reading S3 credentials [TO BE CONFIRMED: vault-pgbackrest integration not explicitly shown in pgbackrest.conf] |
-| MinKMS        | Planned but NOT yet implemented: MinKMS would use Vault Transit to wrap its HSM master key      |
-| Docker secrets | Vault token is read from a file mounted into the PostgreSQL container at `./vault_token.txt`  |
+| Component      | Integration                                                                                      |
+|----------------|--------------------------------------------------------------------------------------------------|
+| pg_tde         | Reads token from `vault_token.txt`; calls KV v2 (`pg_tde/data/global-master-key-one`) at startup  |
+| **MinKMS**     | **Implemented** — AppRole `minkms-role` authenticates to Transit engine at startup only; root seal key never stored in plaintext |
+| pgBackRest     | Same `vault_token.txt` token as pg_tde; authenticates to Vault for any secret reads              |
+| Docker secrets | Token file mounted at `./vault_token.txt` → `/etc/postgresql/secrets/vault_token.txt` inside container |
 
 ## Known Issues & Research Findings
 
 ### TLS Disabled — Production Risk
 
-The Vault server in this R&D environment uses `tls_disable: true` for simplicity. All token material and key data flows over unencrypted HTTP within the Docker network. While the Docker overlay network provides some isolation, this is not acceptable for production deployment.
+The Vault server uses `tls_disable: true` for simplicity. All token material and key data flows over unencrypted HTTP within the Docker network. **Enable TLS in production** with a proper certificate.
 
 ### File Storage Backend — Not HA
 
-The `file` storage backend does not support Vault High Availability. If the Vault container restarts, Vault must be manually unsealed (using the unseal keys in `vault/custom/vault-seal.json`). For production, use Raft integrated storage with automatic unseal (AWS KMS, GCP KMS, or Azure Key Vault).
+The `file` storage backend does not support Vault HA. On every container restart, Vault is sealed and requires manual unseal (2 of 3 keys from `vault/custom/vault-seal.json`). For production, use Raft integrated storage with auto-unseal (AWS KMS, GCP KMS, or Azure Key Vault).
 
-### KV Mount Path Inconsistency
+### MinKMS Hard Dependency on Vault at Startup
 
-The `vault-init.sh` script mounts the KV engine at path `tde/`, while the `setup_postgres_tde.txt` manual instructions use path `pg_tde/`. The `postgres_setup.docker.sh` script uses `pg_tde` as the mount path. [TO BE CONFIRMED: verify which path is actually live by running `vault secrets list` inside the vault container.]
+MinKMS calls Vault Transit at startup to unseal. If Vault is sealed or unreachable, MinKMS will refuse to start. Required startup order: **Vault (unsealed) → MinKMS → MinIO AIStor**. See `docs/operations/cluster-setup-order.md` for the full sequence.
 
 ### Token Expiry is Not Monitored
 
-Vault tokens generated with `-ttl=8760h` (1 year) will expire silently. When the token expires, pg_tde will fail to fetch decryption keys on the next server restart, potentially causing the cluster to fail to start. Implement token renewal via `vault token renew` via a cron job or Vault Agent.
+Vault tokens generated with `-ttl=8760h` (1 year) will expire silently. When the token expires, pg_tde will fail to fetch decryption keys on the next restart, potentially causing the entire cluster to fail to start. Implement token renewal via `vault token renew` in a cron job or use Vault Agent.
+
+### MinKMS AppRole Secret ID Has No TTL
+
+The `secret_id` in `minio/minkms/config.yaml` has no TTL or use limit by default. For production, set `secret_id_ttl` and `secret_id_num_uses` on the AppRole, and automate rotation via Vault Agent or a CI pipeline.
 
 ## Operational Notes
 

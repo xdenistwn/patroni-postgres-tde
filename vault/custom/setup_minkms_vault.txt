@@ -1,0 +1,46 @@
+1. if using container, go inside the container vault service.
+2. set the VAULT_TOKEN=YOUR_TOKEN (you can use root from vault-seal.json) for authorization
+3. set the export VAULT_SKIP_VERIFY=true (bypass tls handshake if local setup)
+4. setup transit engine for minkms
+vault secrets enable transit
+5. create the sealing key in transit engine
+vault write -f transit/keys/minkms-sealing-key
+6. setup policy for minkms:
+```
+vault policy write minkms-policy - <<EOF
+path "transit/encrypt/minkms-sealing-key" {
+  capabilities = ["create", "update"]
+}
+
+path "transit/decrypt/minkms-sealing-key" {
+  capabilities = ["create", "update"]
+}
+
+path "transit/hmac/minkms-sealing-key" {
+  capabilities = ["create", "update"]
+}
+
+path "transit/sign/minkms-sealing-key" {
+  capabilities = ["create", "update"]
+}
+
+path "transit/verify/minkms-sealing-key" {
+  capabilities = ["create", "update"]
+}
+
+path "transit/keys/minkms-sealing-key" {
+  capabilities = ["read", "create", "update"]
+}
+EOF
+```
+
+7. create minkms-policy approle
+vault write auth/approle/role/minkms-role policies="minkms-policy"
+
+8. Generate the role id and secret id for minkms
+ROLE_ID=$(vault read -field=role_id auth/approle/role/minkms-role/role-id)
+SECRET_ID=$(vault write -f -field=secret_id auth/approle/role/minkms-role/secret-id)
+echo "Role ID: $ROLE_ID"
+echo "Secret ID: $SECRET_ID"
+
+9. Put the generated Role ID and Secret ID into your minio/minkms/config.yaml under hsm.hashicorp.vault.approle.

@@ -1,6 +1,34 @@
 version: v1
 
+# TLS: MinKMS exposes its own TLS endpoint.
+# RSA cert is used here for R&D; consider ECDSA/EdDSA in production.
 tls:
   certs:
   - key: /etc/minkms/certs/private.key
     cert: /etc/minkms/certs/public.crt
+
+# HSM: instead of a local software key, the MinKMS root seal key is wrapped/unwrapped
+# by HashiCorp Vault's Transit secret engine. This means:
+#   - MinKMS data at rest is protected by a Vault-managed AES-256-GCM96 key.
+#   - Key material never leaves Vault in plaintext.
+#   - Access is controlled by Vault AppRole (minkms-role / minkms-policy).
+#   - Vault must be running and unsealed for MinKMS to start.
+#
+# To rotate the sealing key:
+#   vault write -f transit/keys/minkms-sealing-key/rotate
+#   (MinKMS will automatically re-wrap on next restart)
+hsm:
+  hashicorp:
+    vault:
+      # Vault API address — must be reachable from the minkms container.
+      # In Docker Compose, "vault" resolves via the shared pg_network.
+      server: "http://vault:8200"
+      # AppRole credentials (role_id + secret_id) created in Vault for minkms-role.
+      # Policy: transit encrypt/decrypt/hmac/sign/verify + keys read on minkms-sealing-key.
+      approle:
+        id: "4ba35775-2ced-b4b2-c917-380c9ff8d315"
+        secret: "4a1c140a-bc85-8f00-9ff1-0c70d806a165"
+      # Transit engine wraps the MinKMS root key.
+      transit:
+        engine: "transit"
+        key: "minkms-sealing-key"

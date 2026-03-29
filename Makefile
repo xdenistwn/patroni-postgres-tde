@@ -23,6 +23,8 @@ down-minkms:
 	docker-compose -f minio/minkms/docker-compose.yml down
 logs-minkms:
 	docker-compose -f minio/minkms/docker-compose.yml logs -f
+remove-minkms:
+	docker volume rm minkms_minkms_data;
 
 up-minio:
 	docker-compose -f minio/aistor/docker-compose.yml up -d
@@ -32,6 +34,8 @@ down-minio:
 	docker-compose -f minio/aistor/docker-compose.yml down
 logs-minio:
 	docker-compose -f minio/aistor/docker-compose.yml logs -f
+remove-minio:
+	docker volume rm aistor_minio_data;
 
 up-vault:
 	docker-compose -f vault/docker-compose.yml up -d
@@ -41,6 +45,8 @@ down-vault:
 	docker-compose -f vault/docker-compose.yml down
 logs-vault:
 	docker-compose -f vault/docker-compose.yml logs -f
+remove-vault:
+	docker volume rm vault_vault_data;
 
 up-etcd:
 	docker-compose -f etcd/node1/docker-compose.yml up -d
@@ -85,9 +91,4 @@ remove-pg2:
 logs-pg2:
 	docker-compose -f postgres/replica_one/docker-compose.yml logs -f;
 
-remove-pg:
-	docker-compose -f postgres/master/docker-compose.yml down;
-	docker-compose -f postgres/replica_one/docker-compose.yml down;
-	docker volume rm master_postgres_one_data;
-	docker volume rm replica_one_postgres_two_data;
-
+remove-pg: down-pg1 remove-pg1 down-pg2 remove-pg2

@@ -1,41 +1,47 @@
-## Description
-After extensive research and trial-and-error over the past two weeks, I am presenting this repository which provides a simple high-availability PostgreSQL cluster setup using Patroni, etcd, pg_tde, and HashiCorp Vault in container. It ensures that your data is encrypted at rest (TDE) and that encryption keys are securely managed in a centralized Vault instance.
-> ⚠️ This repository is currently under active development and constant improvement. It is primarily used for research and development purposes and may not be production-ready.
+# Patroni PostgreSQL TDE & High Availability Cluster
 
+Welcome to the Patroni PostgreSQL Transparent Data Encryption (TDE) cluster project. This repository provides a complete, containerized environment for running a highly-available, fully encrypted PostgreSQL 18 cluster using Percona Distribution, HashiCorp Vault, MinIO, and etcd.
+
+> ⚠️ **CRITICAL: READ THE DOCS FIRST** ⚠️
+> This architecture is highly advanced and involves precise service-startup sequences, encryption sealing, and timeline restorations. 
+> **You MUST read the documentation in the [`/docs`](./docs) directory before attempting to build, test, or operate this cluster.** 
+> Start by reading the [Main Documentation Index](./docs/README.md) and the [Cluster Setup Order](./docs/operations/cluster-setup-order.md).
+
+> ⚠️ This repository is currently under active development and constant improvement. It is primarily used for research and development purposes and may not be production-ready.
 > ⚠️ All Certificates are self-signed, sensitive token, else are for development purposes only. nothing to worry.
 
-## Overview
-The architecture consists of:
-- **PostgreSQL 18 (Percona Distribution)**: High-performance database engine with `pg_tde` built-in.
-- **Patroni**: Template for PostgreSQL High Availability.
-- **etcd**: Distributed Configuration Store (DCS) for cluster coordination and leader election.
-- **pg_tde**: Transparent Data Encryption extension that offloads key management to an external provider.
-- **HashiCorp Vault**: Secure centralized storage for TDE master keys.
-- **PgBouncer**: Lightweight connection pooler for PostgreSQL.
+## What is this project?
+This repository is the culmination of extensive R&D to build a production-grade, containerized database stack where security and reliability are the absolute top priorities. 
 
-## Key Features
-- **Automated Failover**: Patroni manages the cluster state and handles primary election automatically.
-- **Centralized Key Management**: Master keys never touch the database disk; they live inside Vault.
-- **Transparent Encryption**: Tables are encrypted using the `tde_heap` access method.
-- **Encrypted Replication**: Both WAL and basebackups are encrypted using `pg_tde` during streaming.
-- **Connection Pooling**: PgBouncer manages connection pooling to reduce database overhead and improve performance.
+**Core capabilities:**
+- **Automated Failover**: Patroni handles primary election automatically using `etcd` as a distributed configuration store.
+- **Secure Key Management**: Encryption master keys never touch the database disk. They are stored centrally in **HashiCorp Vault**.
+- **Transparent Data Encryption (TDE)**: Tables are encrypted locally using the `tde_heap` access method powered by `pg_tde`.
+- **Encrypted Replication & Backups**: Streaming WAL and pgBackRest basebackups are stored safely using SSE-KMS via **MinIO** and **MinKMS**.
+- **Point-In-Time-Recovery (PITR)**: We feature complete, mathematically isolated PITR simulation pipelines to recover dropped tables or records reliably.
 
-## Prerequisites
-- **Docker & Docker Compose**: v2.x or higher recommended.
-- **Environment Config**: A configured `.env` file based on the provided variables.
+> **Note on Monitoring:** 
+> Observability components are currently under development. In a future update, we will be integrating **Prometheus and Grafana** directly into this stack to provide live metric dashboards and alerting for the PostgreSQL cluster status.
 
 ## Feature Progress
-| Feature | Status | branch |
-| :--- | :---: | ---: |
+| Feature | Status | Branch |
+| :--- | :---: | :---: |
 | Setup Postgres cluster with 2 nodes (Primary, Replica) + 3 etcd | ✅ | main |
-| Apply `pg_tde` extension to postgres and integrated with HashiCorp Vault | ✅ | main |
+| Apply `pg_tde` extension to postgres and integrate with HashiCorp Vault | ✅ | main |
 | Support WAL/Basebackup encryption using `pg_tde_basebackup` and `pg_tde.wal_encrypt` | ✅ | main |
 | Handle Master Key rotation | ✅ | main |
 | PgBouncer layer implementation | ✅ | main |
 | Archiving into Object Storage with SSE (S3, MinIO) | ✅ | main |
-| Monitoring (Prometheus, Grafana) | - | - |
-| Apply SSL/TLS between services | - | - |
+| Apply SSL/TLS between services | ✅ | main |
+| Point-In-Time-Recovery (PITR) workflow and simulation | ✅ | main |
+| **Monitoring (Prometheus, Grafana) integration** | ⏳ | *Coming Soon* |
 
-### Setup
-TBA / or you check Makefile at the root folder for now.
-run the vault, minkms, minio, etcd, then pg-1 pg-2.
+## Quick Start
+Do not blindly run these commands without reading the docs. The setup has a strict initialization order (Vault → MinKMS → MinIO → etcd → Postgres). 
+
+1. Ensure Docker & Docker Compose (v2.x) are installed.
+2. Review the `Makefile` and `.env` files in the root directory.
+3. Read the required sequence in [`docs/operations/cluster-setup-order.md`](./docs/operations/cluster-setup-order.md) to initialize the Vault Transit keys and MinIO buckets safely.
+
+---
+*For detailed architecture diagrams, component breakdown, and operational runbooks, please proceed immediately to the [`/docs/README.md`](./docs/README.md) file.*
