@@ -31,7 +31,7 @@ graph TD
         E3["etcd3\nport 2379/2380\nmTLS"]
     end
 
-    PG1 -- "Streaming Replication\nWAL shipping" --> PG2
+    PG1 -- "[6] Streaming Replication\nWAL shipping" --> PG2
 
     subgraph "Key Management"
         VAULT["Vault :8200"]
@@ -44,31 +44,43 @@ graph TD
 
     EXT["PostgreSQL Extensions:\npg_tde, pg_partman, pg_cron\npg_repack, pg_stat_monitor\npgAudit, pgBackRest"]
 
-    APP -->|"write/read"| PGB1
-    APP -->|"read-only"| PGB2
-    BENCH -->|"write/read"| PGB1
-    PGB1 --> PG1
-    PGB2 --> PG2
+    APP -->|"[8] write/read"| PGB1
+    APP -->|"[8] read-only"| PGB2
+    BENCH -->|"[8] benchmark"| PGB1
+    PGB1 -->|"[9] pooled queries"| PG1
+    PGB2 -->|"[9] pooled queries"| PG2
 
-    PG1 <-->|"leader election\nLock / TTL=30s"| E1
-    PG1 <-->|"heartbeat"| E2
-    PG1 <-->|"heartbeat"| E3
-    PG2 <-->|"DCS watch"| E1
-    PG2 <-->|"DCS watch"| E2
-    PG2 <-->|"DCS watch"| E3
+    PG1 <-->|"[3] leader election\nLock / TTL=30s"| E1
+    PG1 <-->|"[3] heartbeat"| E2
+    PG1 <-->|"[3] heartbeat"| E3
+    PG2 <-->|"[4] DCS watch"| E1
+    PG2 <-->|"[4] DCS watch"| E2
+    PG2 <-->|"[4] DCS watch"| E3
 
-    PG1 -->|"key provider"| VAULT
-    PG2 -->|"key provider"| VAULT
+    PG1 -->|"[5] pg_tde key provider"| VAULT
+    PG2 -->|"[5] pg_tde key provider"| VAULT
 
-    PG1 -->|"archive-push\npgBackRest"| MINIO
-    PG2 -->|"archive-get"| MINIO
+    PG1 -->|"[7] archive-push\npgBackRest"| MINIO
+    PG2 -->|"[7] archive-get"| MINIO
 
-    MINIO -->|"SSE-KMS"| MINKMS
-    MINKMS -->|"Transit seal-wrap\n(startup only)"| VAULT
+    MINIO -->|"[2] SSE-KMS API"| MINKMS
+    MINKMS -->|"[1] Transit seal-wrap\n(startup only)"| VAULT
 
-    EXT -.->|"active on"| PG1
-    EXT -.->|"active on"| PG2
+    EXT -.->|"[0] active on"| PG1
+    EXT -.->|"[0] active on"| PG2
 ```
+
+### Flow & Initialization Sequence
+
+The architecture follows a strict chronological boot sequence and data path, marked `[0]` through `[9]` in the diagram:
+
+- **[0] Core Extensions**: PostgreSQL extensions (pg_tde, pg_partman, Patroni) embed dynamically into the database nodes.
+- **[1 - 2] Storage Security**: Key Management boots first. MinKMS uses the Vault Transit engine to seal-wrap its root keys (`[1]`), allowing MinIO to securely authenticate for SSE-KMS (`[2]`).
+- **[3 - 4] High Availability (HA)**: Patroni spins up, acquiring distributed locks via `etcd` (`[3]`) and assigning replica monitoring roles (`[4]`).
+- **[5] Database Encryption at Rest**: `pg_tde` actively contacts the Vault Key Provider to securely retrieve master keys for disk encryption.
+- **[6] Replication**: Encrypted WAL streaming activates tightly between the Patroni Leader and Replica.
+- **[7] Disaster Recovery**: Continuous `pgBackRest` archiving begins aggressively pushing historical WALs into the MinIO SSE-KMS bucket.
+- **[8 - 9] Client Applications**: Incoming queries (`[8]`) hit `PgBouncer` connection pools (`[9]`), which vastly reduces the heavy native connection overhead running against the primary databases.
 
 ## Component Index
 
