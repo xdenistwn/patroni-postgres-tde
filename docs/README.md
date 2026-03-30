@@ -100,8 +100,9 @@ The architecture follows a strict chronological boot sequence and data path, mar
 |12 | pgBackRest             | [12-pgbackrest.md](components/12-pgbackrest.md)   | Backup & Point-In-Time Recovery             | percona-pgbackrest            |
 |13 | pg_stat_monitor        | [13-pg_stat_monitor.md](components/13-pg_stat_monitor.md) | Query performance analytics         | PGDG — pg_stat_monitor_18     |
 |14 | pgAudit                | [14-pgaudit.md](components/14-pgaudit.md)         | Audit logging                               | postgresql-18-audit (PGDG)    |
-|15 | Prometheus / Grafana   | *Integration Pending*                             | Cluster status, logs, & telemetry monitoring| *Coming Soon*                 |
-|16 | PITR Simulation        | [pitr-simulation.md](operations/pitr-simulation.md) | Disaster recovery via isolated WAL replay   | Operational Runbook           |
+|15 | HAProxy                | [15-haproxy.md](components/15-haproxy.md)         | Multi-tenant routing and Read/Write splitting| haproxy:3.1-alpine            |
+|16 | Prometheus / Grafana   | *Integration Pending*                             | Cluster status, logs, & telemetry monitoring| *Coming Soon*                 |
+|17 | PITR Simulation        | [pitr-simulation.md](operations/pitr-simulation.md) | Disaster recovery via isolated WAL replay   | Operational Runbook           |
 
 ## How to Read This Documentation
 

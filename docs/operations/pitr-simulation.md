@@ -99,7 +99,7 @@ We will use the `postgres/restore` node to perform the PITR.
 2. **Clean up any old restore data**: We want a clean slate for Patroni to trigger the bootstrap.
    
    ```bash
-   docker-compose -f postgres/restore/docker-compose.yml down
+   docker compose -f postgres/restore/docker-compose.yml down
    docker volume rm restore_postgres_restore_data
    docker exec -it etcd1 etcdctl --endpoints=https://etcd1:2379 --cacert=/certs/ca.crt --cert=/certs/public.crt --key=/certs/private.key del --prefix /db/postgres-restore
    ```
@@ -109,8 +109,8 @@ We will use the `postgres/restore` node to perform the PITR.
 3. **Start the Restore Container**:
 
    ```bash
-   docker-compose -f postgres/restore/docker-compose.yml up -d &&
-   docker-compose -f postgres/restore/docker-compose.yml logs -f
+   docker compose -f postgres/restore/docker-compose.yml up -d &&
+   docker compose -f postgres/restore/docker-compose.yml logs -f
    ```
    **Verify the node is starting and restoring**:
    *Look for pgBackRest logs fetching the WAL segments from MinIO up until your target time, followed by PostgreSQL entering read-write mode (promoted).*
@@ -156,7 +156,7 @@ docker exec -it postgres-one psql -U postgres -d postgres -c "SELECT * FROM crit
 If everything looks correct, you can safely spin down and remove the restore node, as we no longer need it.
 
 ```bash
-docker-compose -f postgres/restore/docker-compose.yml down -v
+docker compose -f postgres/restore/docker-compose.yml down -v
 # Also delete the scope from etcd
 docker exec -it etcd1 etcdctl --endpoints=https://etcd1:2379 --cacert=/certs/ca.crt --cert=/certs/public.crt --key=/certs/private.key del --prefix /db/postgres-restore
 ```

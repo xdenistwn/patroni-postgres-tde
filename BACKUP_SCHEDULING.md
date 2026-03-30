@@ -64,12 +64,12 @@ If you're running in Kubernetes, use a CronJob resource.
 
 Check backup status:
 ```bash
-docker-compose exec -u postgres postgres-one pgbackrest --stanza=patroni-tde info
+docker compose exec -u postgres postgres-one pgbackrest --stanza=patroni-tde info
 ```
 
 View backup details:
 ```bash
-docker-compose exec -u postgres postgres-one pgbackrest --stanza=patroni-tde info --output=json
+docker compose exec -u postgres postgres-one pgbackrest --stanza=patroni-tde info --output=json
 ```
 
 ## What's Already Running Automatically

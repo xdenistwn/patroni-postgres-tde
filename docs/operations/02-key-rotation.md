@@ -75,7 +75,7 @@ Because the MinKMS in this R&D stack uses a static `MINIO_KMS_SSE_KEY` environme
    ```
 3. Restart the MinIO container (this causes a brief interruption to backups):
    ```bash
-   docker-compose -f minio/aistor/docker-compose.yml up -d
+   docker compose -f minio/aistor/docker-compose.yml up -d
    ```
 
 *Note: In a true production environment with MinKMS connected to Vault Transit, you would rotate the key directly via the MinKMS/Vault API without restarting the MinIO container.*
