@@ -18,9 +18,9 @@ Patroni uses etcd to store cluster state and elect a leader. The etcd cluster mu
 
 ```bash
 # Start all three etcd nodes in the background
-docker-compose -f etcd/node1/docker-compose.yml up -d
-docker-compose -f etcd/node2/docker-compose.yml up -d
-docker-compose -f etcd/node3/docker-compose.yml up -d
+docker compose -f etcd/node1/docker-compose.yml up -d
+docker compose -f etcd/node2/docker-compose.yml up -d
+docker compose -f etcd/node3/docker-compose.yml up -d
 
 # Verify etcd quorum health
 docker exec etcd1 etcdctl \
@@ -39,10 +39,10 @@ docker exec etcd1 etcdctl \
 
 ```bash
 # Start Vault
-docker-compose -f vault/docker-compose.yml up -d
+docker compose -f vault/docker-compose.yml up -d
 
 # Start MinKMS (required by MinIO later)
-docker-compose -f minio/minkms/docker-compose.yml up -d
+docker compose -f minio/minkms/docker-compose.yml up -d
 
 # Wait a few seconds for Vault to start, then initialise policies and tokens
 docker exec -t vault sh /vault/config/vault-init.sh
@@ -61,7 +61,7 @@ pgBackRest needs MinIO online to archive Write-Ahead Logs (WAL). If PostgreSQL s
 
 ```bash
 # Start MinIO AIStor
-docker-compose -f minio/aistor/docker-compose.yml up -d
+docker compose -f minio/aistor/docker-compose.yml up -d
 
 # Check MinIO AIStor health
 curl -fk https://localhost:9000/minio/health/live
@@ -76,7 +76,7 @@ Start the first PostgreSQL node. Patroni will connect to etcd, realize no cluste
 
 ```bash
 # Start postgres-one
-docker-compose -f postgres/master/docker-compose.yml up -d
+docker compose -f postgres/master/docker-compose.yml up -d
 
 # Watch the Patroni logs to confirm successful bootstrap
 docker logs -f postgres-one
@@ -118,7 +118,7 @@ Now that the leader is running, encrypted, and backed up, start the replica. Pat
 
 ```bash
 # Start postgres-two
-docker-compose -f postgres/replica_one/docker-compose.yml up -d
+docker compose -f postgres/replica_one/docker-compose.yml up -d
 
 # Watch the replica logs
 docker logs -f postgres-two

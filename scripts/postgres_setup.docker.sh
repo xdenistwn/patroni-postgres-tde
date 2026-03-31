@@ -27,7 +27,7 @@ printf "Port            [5432]: "
 read -r _PORT_INPUT
 DB_PORT=${_PORT_INPUT:-"5432"}
 
-# App Users from Environment (passed via docker-compose)
+# App Users from Environment (passed via docker compose)
 APP_DBA_USER=${DB_USER_NAME}
 APP_DBA_PASS=${DB_USER_PASSWORD}
 APP_DEV_USER=${DB_DEV_USER_NAME}
