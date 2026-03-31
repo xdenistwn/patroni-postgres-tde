@@ -2,5 +2,3 @@
 *.log
 .DS_Store
 node_modules/
-haproxy/
-docs/components/15-haproxy.md
