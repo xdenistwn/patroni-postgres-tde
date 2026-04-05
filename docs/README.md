@@ -9,8 +9,12 @@ This documentation covers a production-grade PostgreSQL 18 high-availability (HA
 ```mermaid
 graph TD
     subgraph "Client Tier"
-        APP["Application\n(any language)"]
+        APP["Application\n(Laravel/PHP)"]
         BENCH["pgBench\nbenchmarking"]
+    end
+
+    subgraph "Load Balancer (with Virtual IP and Keepalived)"
+        HAPROXY["HAProxy\nRouting & RW Split\nPort 5001(RW) / 5101(RO)\nPort 5002(RW) / 5102(RO)"]
     end
 
     subgraph "VM: PostgreSQL + etcd + PgBouncer Node 1"
@@ -44,11 +48,12 @@ graph TD
 
     EXT["PostgreSQL Extensions:\npg_tde, pg_partman, pg_cron\npg_repack, pg_stat_monitor\npgAudit, pgBackRest"]
 
-    APP -->|"[8] write/read"| PGB1
-    APP -->|"[8] read-only"| PGB2
-    BENCH -->|"[8] benchmark"| PGB1
-    PGB1 -->|"[9] pooled queries"| PG1
-    PGB2 -->|"[9] pooled queries"| PG2
+    APP -->|"[8] query"| HAPROXY
+    BENCH -->|"[8] benchmark"| HAPROXY
+    HAPROXY -->|"[9] write/read\n(port 5001/5002)"| PGB1
+    HAPROXY -->|"[9] read-only\n(port 5101/5102)"| PGB2
+    PGB1 -->|"[10] pooled queries"| PG1
+    PGB2 -->|"[10] pooled queries"| PG2
 
     PG1 <-->|"[3] leader election\nLock / TTL=30s"| E1
     PG1 <-->|"[3] heartbeat"| E2
@@ -80,7 +85,8 @@ The architecture follows a strict chronological boot sequence and data path, mar
 - **[5] Database Encryption at Rest**: `pg_tde` actively contacts the Vault Key Provider to securely retrieve master keys for disk encryption.
 - **[6] Replication**: Encrypted WAL streaming activates tightly between the Patroni Leader and Replica.
 - **[7] Disaster Recovery**: Continuous `pgBackRest` archiving begins aggressively pushing historical WALs into the MinIO SSE-KMS bucket.
-- **[8 - 9] Client Applications**: Incoming queries (`[8]`) hit `PgBouncer` connection pools (`[9]`), which vastly reduces the heavy native connection overhead running against the primary databases.
+- **[8 - 9] Client Applications**: Incoming queries (`[8]`) hit `HAProxy`, which checks Patroni API health to determine routing. It correctly pipes traffic into `PgBouncer` connection pools (`[9]`), supporting native read/write splitting.
+- **[10] Database Access**: PgBouncer vastly reduces the heavy native connection overhead running against the primary databases (`[10]`).
 
 ## Component Index
 
