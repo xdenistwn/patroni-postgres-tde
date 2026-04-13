@@ -29,7 +29,7 @@ services:
       - "2479:2379"
       - "2480:2380"
     networks:
-      - pg_network
+      - region_singapore_net
     volumes:
       - etcd2_data:/etcd-data
       - ./certs:/certs:ro
@@ -43,5 +43,5 @@ volumes:
   etcd2_data:
 
 networks:
-  pg_network:
+  region_singapore_net:
     external: true

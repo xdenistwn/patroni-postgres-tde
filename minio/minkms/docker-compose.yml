@@ -8,7 +8,7 @@ services:
     external_links:
       - vault
     networks:
-      - pg_network
+      - region_singapore_net
     ports:
       - "7373:7373"
     volumes:
@@ -24,5 +24,5 @@ volumes:
   minkms_data:
 
 networks:
-  pg_network:
+  region_singapore_net:
     external: true

@@ -33,7 +33,7 @@ services:
       - "6433:6432"
       - "8009:8008"
     networks:
-      - pg_network
+      - region_singapore_net
     volumes:
       - postgres_two_data:/data/db
       - ./patroni-two.yml:/etc/patroni/patroni.yml
@@ -48,7 +48,7 @@ services:
       retries: 5
 
 networks:
-  pg_network:
+  region_singapore_net:
     external: true
 
 volumes:

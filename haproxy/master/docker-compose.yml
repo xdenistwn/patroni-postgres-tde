@@ -23,7 +23,7 @@ services:
     networks:
       haproxy_ha:
         ipv4_address: 10.51.0.10
-      pg_network: {}
+      region_singapore_net: {}
     healthcheck:
       test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg || exit 1"]
       interval: 30s
@@ -33,5 +33,5 @@ services:
 networks:
   haproxy_ha:
     external: true
-  pg_network:
+  region_singapore_net:
     external: true

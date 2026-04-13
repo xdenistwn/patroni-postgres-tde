@@ -6,7 +6,7 @@ services:
     ports:
       - "8200:8200"
     networks:
-      - pg_network
+      - region_singapore_net
     cap_add:
       - IPC_LOCK
     volumes:
@@ -34,5 +34,5 @@ volumes:
   vault_data:
 
 networks:
-  pg_network:
+  region_singapore_net:
     external: true  

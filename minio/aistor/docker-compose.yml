@@ -13,7 +13,7 @@ services:
     container_name: minio
     hostname: minio
     networks:
-      - pg_network
+      - region_singapore_net
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -38,5 +38,5 @@ volumes:
   minio_data:
 
 networks:
-  pg_network:
+  region_singapore_net:
     external: true
