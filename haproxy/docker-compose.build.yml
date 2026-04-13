@@ -1,0 +1,6 @@
+services:
+  haproxy-keepalived:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: haproxy-keepalived:latest

@@ -1,4 +1,8 @@
-.PHONY: all up down restart status logs up-minkms up-aistor down-minkms down-aistor
+.PHONY: all up down restart status logs up-minkms up-aistor down-minkms down-aistor \
+	up-haproxy down-haproxy stop-haproxy restart-haproxy logs-haproxy \
+	up-haproxy-master down-haproxy-master stop-haproxy-master restart-haproxy-master logs-haproxy-master \
+	up-haproxy-standby down-haproxy-standby stop-haproxy-standby restart-haproxy-standby logs-haproxy-standby \
+	build-haproxy
 
 # all: up
 
@@ -12,6 +16,9 @@
 
 create-network:
 	docker network create --driver bridge pg_network
+
+create-haproxy-network:
+	docker network create --driver bridge --subnet 10.51.0.0/24 haproxy_ha
 
 logs: logs-pg1 logs-pg2 logs-etcd
 
@@ -93,13 +100,33 @@ logs-pg2:
 
 remove-pg: down-pg1 remove-pg1 down-pg2 remove-pg2
 
-up-haproxy:
-	docker compose -f haproxy/docker-compose.yml up -d;
-down-haproxy:
-	docker compose -f haproxy/docker-compose.yml down;
-stop-haproxy:
-	docker compose -f haproxy/docker-compose.yml stop;
-restart-haproxy:
-	docker compose -f haproxy/docker-compose.yml restart;
-logs-haproxy:
-	docker compose -f haproxy/docker-compose.yml logs -f;
+up-haproxy: up-haproxy-master up-haproxy-standby
+down-haproxy: down-haproxy-master down-haproxy-standby
+stop-haproxy: stop-haproxy-master stop-haproxy-standby
+restart-haproxy: restart-haproxy-master restart-haproxy-standby
+logs-haproxy: logs-haproxy-master
+
+build-haproxy:
+	docker compose -f haproxy/docker-compose.build.yml build
+
+up-haproxy-master:
+	docker compose -f haproxy/master/docker-compose.yml up -d;
+down-haproxy-master:
+	docker compose -f haproxy/master/docker-compose.yml down;
+stop-haproxy-master:
+	docker compose -f haproxy/master/docker-compose.yml stop;
+restart-haproxy-master:
+	docker compose -f haproxy/master/docker-compose.yml restart;
+logs-haproxy-master:
+	docker compose -f haproxy/master/docker-compose.yml logs -f;
+
+up-haproxy-standby:
+	docker compose -f haproxy/standby/docker-compose.yml up -d;
+down-haproxy-standby:
+	docker compose -f haproxy/standby/docker-compose.yml down;
+stop-haproxy-standby:
+	docker compose -f haproxy/standby/docker-compose.yml stop;
+restart-haproxy-standby:
+	docker compose -f haproxy/standby/docker-compose.yml restart;
+logs-haproxy-standby:
+	docker compose -f haproxy/standby/docker-compose.yml logs -f;

@@ -9,8 +9,18 @@ This documentation covers a production-grade PostgreSQL 18 high-availability (HA
 ```mermaid
 graph TD
     subgraph "Client Tier"
-        APP["Application\n(any language)"]
+        APP["Application\n(Laravel/PHP)"]
         BENCH["pgBench\nbenchmarking"]
+    end
+
+    subgraph "High Availability Load Balancer"
+        VIP["Keepalived VIP\n10.51.0.100"]
+        HAM["HAProxy Master\n(Active)\n10.51.0.10"]
+        HAS["HAProxy Standby\n(Passive)\n10.51.0.11"]
+        
+        VIP --- HAM
+        VIP -.-> HAS
+        HAM <-->|"VRRP Heartbeat"| HAS
     end
 
     subgraph "VM: PostgreSQL + etcd + PgBouncer Node 1"
@@ -44,11 +54,17 @@ graph TD
 
     EXT["PostgreSQL Extensions:\npg_tde, pg_partman, pg_cron\npg_repack, pg_stat_monitor\npgAudit, pgBackRest"]
 
-    APP -->|"[8] write/read"| PGB1
-    APP -->|"[8] read-only"| PGB2
-    BENCH -->|"[8] benchmark"| PGB1
-    PGB1 -->|"[9] pooled queries"| PG1
-    PGB2 -->|"[9] pooled queries"| PG2
+    APP -->|"[8] query"| VIP
+    BENCH -->|"[8] benchmark"| VIP
+    
+    HAM -->|"[9] write/read\n(port 5001)"| PGB1
+    HAM -->|"[9] read-only\n(port 5101)"| PGB2
+    
+    HAS -.->|"[9] failover path"| PGB1
+    HAS -.->|"[9] failover path"| PGB2
+
+    PGB1 -->|"[10] pooled queries"| PG1
+    PGB2 -->|"[10] pooled queries"| PG2
 
     PG1 <-->|"[3] leader election\nLock / TTL=30s"| E1
     PG1 <-->|"[3] heartbeat"| E2
@@ -80,7 +96,8 @@ The architecture follows a strict chronological boot sequence and data path, mar
 - **[5] Database Encryption at Rest**: `pg_tde` actively contacts the Vault Key Provider to securely retrieve master keys for disk encryption.
 - **[6] Replication**: Encrypted WAL streaming activates tightly between the Patroni Leader and Replica.
 - **[7] Disaster Recovery**: Continuous `pgBackRest` archiving begins aggressively pushing historical WALs into the MinIO SSE-KMS bucket.
-- **[8 - 9] Client Applications**: Incoming queries (`[8]`) hit `PgBouncer` connection pools (`[9]`), which vastly reduces the heavy native connection overhead running against the primary databases.
+- **[8 - 9] Client Applications**: Incoming queries (`[8]`) hit the **Keepalived VIP**, which dynamically routes to the active HAProxy node. HAProxy checks Patroni API health to determine routing and pipes traffic into `PgBouncer` connection pools (`[9]`), supporting native high-availability and read/write splitting.
+- **[10] Database Access**: PgBouncer vastly reduces the heavy native connection overhead running against the primary databases (`[10]`).
 
 ## Component Index
 

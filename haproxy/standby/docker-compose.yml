@@ -1,0 +1,35 @@
+services:
+  haproxy-standby:
+    image: haproxy-keepalived:latest
+    container_name: haproxy-standby
+    hostname: haproxy-standby
+    cap_add:
+      # Required by keepalived for VIP management (ARP, IP manipulation)
+      - NET_ADMIN
+      - NET_BROADCAST
+      - NET_RAW
+    ports:
+      # Stats UI (standby — different host port to avoid conflict)
+      - "8405:8404"
+      # Ports are NOT exposed on the host for the standby.
+      # Traffic reaches the standby through the VIP (10.51.0.100),
+      # not through host port mapping.
+    volumes:
+      - ../haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./keepalived.conf:/etc/keepalived/keepalived.conf:ro
+      - ../check_haproxy.sh:/usr/local/bin/check_haproxy.sh:ro
+    networks:
+      haproxy_ha:
+        ipv4_address: 10.51.0.11
+      pg_network: {}
+    healthcheck:
+      test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  haproxy_ha:
+    external: true
+  pg_network:
+    external: true
