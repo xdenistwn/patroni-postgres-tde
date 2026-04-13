@@ -85,7 +85,8 @@ echo "Cluster initialization complete on $TARGET_HOST."
 # --- 2. Setup pg_partman ---
 echo "--- Setting up pg_partman ---"
 echo "Creating extension pg_partman..."
-run_sql "CREATE EXTENSION IF NOT EXISTS pg_partman;"
+run_sql "CREATE SCHEMA IF NOT EXISTS partman;"
+run_sql "CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman;"
 
 # -- 3. Setup pg_repack
 echo "--- Setting up pg_repack ---"

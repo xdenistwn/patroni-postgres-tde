@@ -38,7 +38,7 @@ done
 
 echo "Current primary node: $LEADER"
 echo "Creating stanza '$STANZA_NAME' on $LEADER..."
-# docker exec -t $LEADER pgbackrest --stanza=$STANZA_NAME stanza-create
+docker exec -t $LEADER pgbackrest --stanza=$STANZA_NAME stanza-create
 
 echo "Checking stanza status..."
 docker exec -t $LEADER pgbackrest --stanza=$STANZA_NAME check

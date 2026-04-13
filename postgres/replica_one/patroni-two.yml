@@ -120,6 +120,10 @@ postgresql:
   recovery_conf:
     restore_command: 'pgbackrest --stanza=postgres-patroni-tde archive-get %f "%p"'
 
+log:
+  level: INFO
+  traceback_level: ERROR
+
 tags:
   nofailover: false
   noloadbalance: false
