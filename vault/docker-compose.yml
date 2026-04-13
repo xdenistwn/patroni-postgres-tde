@@ -6,7 +6,7 @@ services:
     ports:
       - "8200:8200"
     networks:
-      - region_singapore_net
+      - sg-prod-zone-1
     cap_add:
       - IPC_LOCK
     volumes:
@@ -34,5 +34,5 @@ volumes:
   vault_data:
 
 networks:
-  region_singapore_net:
+  sg-prod-zone-1:
     external: true  

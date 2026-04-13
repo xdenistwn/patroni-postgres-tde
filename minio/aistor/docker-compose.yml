@@ -13,7 +13,7 @@ services:
     container_name: minio
     hostname: minio
     networks:
-      - region_singapore_net
+      - sg-prod-zone-1
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -38,5 +38,5 @@ volumes:
   minio_data:
 
 networks:
-  region_singapore_net:
+  sg-prod-zone-1:
     external: true

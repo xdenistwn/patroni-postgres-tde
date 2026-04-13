@@ -29,7 +29,7 @@ services:
       - "2379:2379"
       - "2380:2380"
     networks:
-      - region_singapore_net
+      - sg-prod-zone-1
     volumes:
       - etcd1_data:/etcd-data
       - ./certs:/certs:ro
@@ -43,5 +43,5 @@ volumes:
   etcd1_data:
 
 networks:
-  region_singapore_net:
+  sg-prod-zone-1:
     external: true

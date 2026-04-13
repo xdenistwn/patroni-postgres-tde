@@ -14,8 +14,8 @@
 # 	docker compose -f minio/minkms/docker-compose.yml ps
 # 	docker compose -f minio/aistor/docker-compose.yml ps
 
-create-network-sg:
-	docker network create --driver bridge region_singapore_net
+create-network-sg-1:
+	docker network create sg-prod-zone-1 --subnet 172.20.0.0/24
 
 logs: logs-pg1 logs-pg2 logs-etcd
 

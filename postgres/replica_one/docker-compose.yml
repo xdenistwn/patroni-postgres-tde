@@ -33,7 +33,7 @@ services:
       - "6433:6432"
       - "8009:8008"
     networks:
-      - region_singapore_net
+      - sg-prod-zone-1
     volumes:
       - postgres_two_data:/data/db
       - ./patroni-two.yml:/etc/patroni/patroni.yml
@@ -48,7 +48,7 @@ services:
       retries: 5
 
 networks:
-  region_singapore_net:
+  sg-prod-zone-1:
     external: true
 
 volumes:

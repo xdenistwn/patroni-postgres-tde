@@ -21,7 +21,7 @@ services:
     networks:
       haproxy_ha:
         ipv4_address: 10.51.0.11
-      region_singapore_net: {}
+      sg-prod-zone-1: {}
     healthcheck:
       test: ["CMD-SHELL", "haproxy -c -f /usr/local/etc/haproxy/haproxy.cfg || exit 1"]
       interval: 30s
@@ -31,5 +31,5 @@ services:
 networks:
   haproxy_ha:
     external: true
-  region_singapore_net:
+  sg-prod-zone-1:
     external: true

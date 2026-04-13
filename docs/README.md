@@ -140,7 +140,7 @@ Performance benchmark reference data is in `docs/benchmarks/`.
 | Property              | Value                                                            |
 |-----------------------|------------------------------------------------------------------|
 | OS / Architecture     | RHEL 9 / aarch64 (arm64); x86_64 Dockerfile also provided       |
-| Deployment model      | Docker Compose (multi-container, external `region_singapore_net`)          |
+| Deployment model      | Docker Compose (multi-container, external `sg-prod-zone-1`)          |
 | PostgreSQL version    | 18.1 (Percona Distribution)                                     |
 | HA topology           | 1 leader (`postgres-one` + etcd1) + 1 replica (`postgres-two` + etcd2) |
 | DCS                   | etcd v3.5.16 — 3-node cluster (co-located etcd1/2, separate etcd3)  |

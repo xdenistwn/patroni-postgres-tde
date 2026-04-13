@@ -206,7 +206,7 @@ See `minio/setup_bucket.md` for full step-by-step with expected output.
 | MinKMS           | MinIO calls MinKMS for every object write/read to perform SSE-KMS encryption (`ggwp-key-1` in enclave `postgres-archive-demo`) |
 | **HashiCorp Vault** | **Implemented** — MinKMS authenticates via AppRole `minkms-role` at startup; Vault Transit wraps the MinKMS root seal key |
 | TLS Certs        | MinIO and MinKMS each have their own self-signed TLS certs (shared Root CA)                               |
-| region_singapore_net       | All containers on external Docker bridge `region_singapore_net` for hostname DNS resolution                         |
+| sg-prod-zone-1       | All containers on external Docker bridge `sg-prod-zone-1` for hostname DNS resolution                         |
 
 ## Known Issues & Research Findings
 

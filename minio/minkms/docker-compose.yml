@@ -8,7 +8,7 @@ services:
     external_links:
       - vault
     networks:
-      - region_singapore_net
+      - sg-prod-zone-1
     ports:
       - "7373:7373"
     volumes:
@@ -24,5 +24,5 @@ volumes:
   minkms_data:
 
 networks:
-  region_singapore_net:
+  sg-prod-zone-1:
     external: true

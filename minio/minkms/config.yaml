@@ -21,7 +21,7 @@ hsm:
   hashicorp:
     vault:
       # Vault API address — must be reachable from the minkms container.
-      # In Docker Compose, "vault" resolves via the shared region_singapore_net.
+      # In Docker Compose, "vault" resolves via the shared sg-prod-zone-1.
       server: "http://vault:8200"
       # AppRole credentials (role_id + secret_id) created in Vault for minkms-role.
       # Policy: transit encrypt/decrypt/hmac/sign/verify + keys read on minkms-sealing-key.

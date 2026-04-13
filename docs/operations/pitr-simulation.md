@@ -3,7 +3,7 @@
 This guide simulates a critical disaster scenario: someone accidentally drops a critical table or column in the production database. 
 Because Patroni immediately streams changes (such as a `DROP TABLE` or `ALTER TABLE ... DROP COLUMN`) to all replicas, the error is immediately propagated across the cluster. We cannot simply failover to a replica to recover the data.
 
-To resolve this, we will perform a PITR by spinning up a completely independent PostgreSQL container (called the "restore node"), joining the same internal Docker network (`region_singapore_net`), retrieving the data up to the very moment before the drop operation, dumping the lost table, and then restoring it back directly into the primary Patroni cluster.
+To resolve this, we will perform a PITR by spinning up a completely independent PostgreSQL container (called the "restore node"), joining the same internal Docker network (`sg-prod-zone-1`), retrieving the data up to the very moment before the drop operation, dumping the lost table, and then restoring it back directly into the primary Patroni cluster.
 
 ## Architecture of the Restore Node
 - We created a `postgres/restore` directory which contains a dedicated `docker-compose.yml` and `patroni-restore.yml`.  
@@ -134,7 +134,7 @@ docker exec -it postgres-restore pg_dump -U postgres -d postgres -t critical_dat
 
 ## 4. Restoring the Data to the Primary Cluster
 
-Because the `postgres-restore` container is on the same `region_singapore_net` as `postgres-one` (the main cluster's primary endpoint), we can use `pg_restore` directly from the `postgres-restore` container to push the data back into the main cluster!
+Because the `postgres-restore` container is on the same `sg-prod-zone-1` as `postgres-one` (the main cluster's primary endpoint), we can use `pg_restore` directly from the `postgres-restore` container to push the data back into the main cluster!
 
 ```bash
 # Push the dump directly into main cluster's primary (postgres-one), port 5432
