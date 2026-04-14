@@ -1,4 +1,9 @@
 1. Download mc client
+```
+wget https://dl.min.io/client/mc/release/linux-amd64/mc
+chmod +x mc
+./mc --help
+```
 
 2. Set Alias (connect to minio)
 command: mc alias set myminio https://localhost:9000 minioadmin minioadmin --insecure

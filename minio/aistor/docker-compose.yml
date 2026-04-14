@@ -27,15 +27,16 @@ services:
       - MINIO_KMS_SSE_KEY=ggwp-key-1
       - MINIO_KMS_ENCLAVE=postgres-archive-demo
       - TZ=Asia/Jakarta
-    command: ["server", "/mnt/data", "--license", "/minio.license"]
+    command: [ "server", "/mnt/data", "--license", "/minio.license" ]
     healthcheck:
-      test: ["CMD", "curl", "-fk", "https://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-fk", "https://localhost:9000/minio/health/live" ]
       interval: 30s
       timeout: 20s
       retries: 3
 
 volumes:
   minio_data:
+
 
 networks:
   sg-prod-zone-1:

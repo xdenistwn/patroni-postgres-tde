@@ -1,0 +1,24 @@
+{
+    "allow": {
+        "KEY:CREATE": [
+            "postgres-cluster-dev-*"
+        ],
+        "KEY:STATUS": [
+            "postgres-cluster-dev-*"
+        ],
+        "KEY:ENCRYPT": [
+            "postgres-cluster-dev-*"
+        ],
+        "KEY:DECRYPT": [
+            "postgres-cluster-dev-*"
+        ],
+        "KEY:GENERATE": [
+            "postgres-cluster-dev-*"
+        ]
+    },
+    "deny": {
+        "KEY:DELETE": [
+            "*"
+        ]
+    }
+}

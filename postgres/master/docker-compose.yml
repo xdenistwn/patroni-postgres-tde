@@ -39,10 +39,10 @@ services:
       - ./patroni-one.yml:/etc/patroni/patroni.yml
       - ./pgbouncer:/etc/pgbouncer
       - ./certs:/etc/postgres/certs:ro
-      - ./vault_token.txt:/etc/postgresql/secrets/vault_token.txt:ro
+      - ../vault_token.local.txt:/etc/postgresql/secrets/vault_token.txt:ro
       - ./pgbackrest:/etc/pgbackrest
     healthcheck:
-      test: ["CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1"]
+      test: [ "CMD-SHELL", "patronictl -c /etc/patroni/patroni.yml list 2>/dev/null | grep -q 'running' || exit 1" ]
       interval: 10s
       timeout: 5s
       retries: 5

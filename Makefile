@@ -15,11 +15,11 @@
 # 	docker compose -f minio/aistor/docker-compose.yml ps
 
 create-network-sg-1:
-	docker network create sg-prod-zone-1 --subnet 172.20.0.0/24
+	docker network create sg-prod-zone-1 --subnet 10.20.0.0/24
 create-network-id-1:
-	docker network create id-prod-zone-1 --subnet 172.21.0.0/24
+	docker network create id-prod-zone-1 --subnet 10.21.0.0/24
 create-network-cloud-1:
-	docker network create cloud-prod-zone-1 --subnet 172.22.0.0/24
+	docker network create cloud-prod-zone-1 --subnet 10.22.0.0/24
 
 logs: logs-pg1 logs-pg2 logs-etcd
 

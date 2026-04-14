@@ -14,14 +14,15 @@ services:
     volumes:
       - minkms_data:/mnt/minio-kms
       - ./certs:/etc/minkms/certs
-      - ./config.yaml:/etc/minkms/config.yaml
+      - ./config.local.yaml:/etc/minkms/config.yaml
     environment:
       - TZ=Asia/Jakarta
       - MINIO_KMS_VOLUME=/mnt/minio-kms
-    command: ["server", "--config", "/etc/minkms/config.yaml", "/mnt/minio-kms"]
+    command: [ "server", "--config", "/etc/minkms/config.yaml", "/mnt/minio-kms" ]
 
 volumes:
   minkms_data:
+
 
 networks:
   sg-prod-zone-1:

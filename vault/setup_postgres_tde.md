@@ -21,11 +21,17 @@ EOF
 ```
 
 6. enable approle (this use for client token such: postgres service, minkms service)
-```vault auth enable approle```
+```
+vault auth enable approle
+```
 
 7. create pg_tde-policy approle
+```
 vault write auth/approle/role/tde-role policies="pg_tde-policy"
+```
 
 8. Generate a token with pg_tde-policy (for pg_tde in postgres service later)
+```
 vault token create -policy="pg_tde-policy" -ttl=8760h -field=token
+```
 you should get token like this: hvs.WKwkwkwkWK_sample_dkRreEFOYU1ZUW5ZY3BUMEhFRXg
