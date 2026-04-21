@@ -11,24 +11,24 @@ result:
 Added `myminio` successfully.
 
 3. Create bucket
-command: mc mb myminio/postgres-archive --insecure
+command: mc mb myminio/postgres-archive-dev-cluster-1 --insecure
 result: 
-Bucket `myminio/postgres-archive` created successfully.
+Bucket `myminio/postgres-archive-dev-cluster-1` created successfully.
 
 4. List bucket
 command: mc ls myminio --insecure
 result: 
-[2026-03-08 05:14:15 UTC]      0B patroni-tde/
+[2026-03-08 05:14:15 UTC]      0B postgres-archive-dev-cluster-1/
 
 5. Set bucket to private (default, but explicit)
-command: mc anonymous set none myminio/postgres-archive --insecure
+command: mc anonymous set none myminio/postgres-archive-dev-cluster-1 --insecure
 result: 
-Access permission for `myminio/postgres-archive` is set to `private`
+Access permission for `myminio/postgres-archive-dev-cluster-1` is set to `private`
 
 6. Create a user for pgbackrest
-command: mc admin user add myminio pgbackrest test-deni-123 --insecure
+command: mc admin user add myminio pgbackrest-dev strong-password-123 --insecure
 result: 
-User `pgbackrest` created successfully.
+User `pgbackrest-dev` created successfully.
 
 7. Create a policy for pgbackrest using aws aim format
 cat > pgbackrest-policy.json <<EOF
@@ -42,7 +42,7 @@ cat > pgbackrest-policy.json <<EOF
         "s3:GetBucketLocation"
       ],
       "Resource": [
-        "arn:aws:s3:::pgbackrest"
+        "arn:aws:s3:::postgres-archive-dev-cluster-1"
       ]
     },
     {
@@ -53,7 +53,7 @@ cat > pgbackrest-policy.json <<EOF
         "s3:DeleteObject"
       ],
       "Resource": [
-        "arn:aws:s3:::pgbackrest/*"
+        "arn:aws:s3:::postgres-archive-dev-cluster-1/*"
       ]
     }
   ]
@@ -66,12 +66,12 @@ result:
 Policy `pgbackrest-policy` created successfully.
 
 9. Attach the policy to the user
-command: mc admin policy attach myminio pgbackrest-policy --user=pgbackrest --insecure
+command: mc admin policy attach myminio pgbackrest-policy --user=pgbackrest-dev --insecure
 result: 
 Attached Policies: [pgbackrest-policy]
-To User: pgbackrest
+To User: pgbackrest-dev
 
 10. Verify the policy
 command: mc admin user list myminio --insecure
 result: 
-enabled    pgbackrest            pgbackrest-policy
+enabled    pgbackrest-dev            pgbackrest-policy

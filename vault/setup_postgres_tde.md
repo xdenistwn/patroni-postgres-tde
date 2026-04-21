@@ -2,21 +2,13 @@
 2. set the VAULT_TOKEN=YOUR_TOKEN (you can use root / auth user) for authorization
 3. set the export VAULT_SKIP_VERIFY=true (bypass tls handshake if local setup)
 4. setup kv engine for postgres
-vault secrets enable -path=pg_tde -version=2 kv
+vault secrets enable -path=postgres-db -version=2 kv
 5. setup policy for pg_tde:
 ```
 vault policy write pg_tde-policy - <<EOF
-path "pg_tde/data/*" {
-  capabilities = ["read", "create", "update", "list"]
-}
-
-path "pg_tde/metadata/*" {
-  capabilities = ["read", "list"]
-}
-
-path "sys/mounts/*" {
-  capabilities = ["read"]
-}
+path "postgres-db/data/*" { capabilities = ["read", "create", "update", "list"] }
+path "postgres-db/metadata/*" { capabilities = ["read", "list"] }
+path "sys/mounts/*" { capabilities = ["read"] }
 EOF
 ```
 
@@ -27,7 +19,7 @@ vault auth enable approle
 
 7. create pg_tde-policy approle
 ```
-vault write auth/approle/role/tde-role policies="pg_tde-policy"
+vault write auth/approle/role/pg_tde-role policies="pg_tde-policy"
 ```
 
 8. Generate a token with pg_tde-policy (for pg_tde in postgres service later)

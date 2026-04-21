@@ -7,8 +7,7 @@ minkms stat -k
 minkms add-enclave -k postgres-archive-dev
 
 4. create a policy that will store into identity
-minkms add-policy -k postgres-archive-dev-policy ./minio/minkms/policy.dev.
-json -e postgres-archive-dev
+minkms add-policy -k postgres-archive-dev-policy ./minio/minkms/policy.dev.json -e postgres-archive-dev
 
 4. add identity for minio aistor
 minkms add-identity -k -e postgres-archive-dev

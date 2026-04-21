@@ -76,7 +76,7 @@ bootstrap:
   
         # Archive mode (enabled with pgBackRest)
         archive_mode: "on"
-        archive_command: "pgbackrest --stanza=postgres-patroni-tde archive-push %p"
+        archive_command: "pgbackrest --stanza=postgres-archive-dev-cluster-1 archive-push %p"
   
   initdb:
     - encoding: UTF8
@@ -118,7 +118,7 @@ postgresql:
     max-rate: 100M
 
   recovery_conf:
-    restore_command: 'pgbackrest --stanza=postgres-patroni-tde archive-get %f "%p"'
+    restore_command: 'pgbackrest --stanza=postgres-archive-dev-cluster-1 archive-get %f "%p"'
 
 log:
   level: INFO

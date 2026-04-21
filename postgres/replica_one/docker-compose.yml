@@ -25,7 +25,6 @@ services:
       - PG_TDE_KEY_PROVIDER=vault
       # pgbackrest configuration
       - PGBACKREST_CONFIG=/etc/pgbackrest/pgbackrest.conf
-      - PGBACKREST_STANZA=postgres-patroni-tde
       # Timezone
       - TZ=Asia/Jakarta
     ports:

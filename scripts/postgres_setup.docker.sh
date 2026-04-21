@@ -14,6 +14,16 @@ while [ -z "$PGPASSWORD" ]; do
 done
 export PGPASSWORD
 
+while [ -z "$VAULT_PROVIDER_NAME" ]; do
+  printf "Vault provider name (required): "
+  read -r VAULT_PROVIDER_NAME
+done
+
+while [ -z "$VAULT_MOUNT_PATH" ]; do
+  printf "Vault mount path (required): "
+  read -r VAULT_MOUNT_PATH
+done
+
 # --- Optional: connection settings (press Enter to use defaults) ---
 printf "Database name   [postgres]: "
 read -r _DB_NAME_INPUT
@@ -33,9 +43,7 @@ APP_DBA_PASS=${DB_USER_PASSWORD}
 APP_DEV_USER=${DB_DEV_USER_NAME}
 APP_DEV_PASS=${DB_DEV_USER_PASSWORD}
 
-VAULT_PROVIDER_NAME="vault-provider"
 VAULT_ADDR=${VAULT_ADDR:-"http://vault:8200"}
-VAULT_MOUNT_PATH=${VAULT_MOUNT_PATH:-"pg_tde"}
 MASTER_KEY_NAME="global-master-key-one"
 TOKEN_FILE_PATH="/etc/postgresql/secrets/vault_token.txt"
 
@@ -85,7 +93,7 @@ echo "Cluster initialization complete on $TARGET_HOST."
 # --- 2. Setup pg_partman ---
 echo "--- Setting up pg_partman ---"
 echo "Creating extension pg_partman..."
-run_sql "CREATE SCHEMA IF NOT EXISTS partman;"
+run_sql "CREATE SCHEMA IF NOT EXISTS partman;" 
 run_sql "CREATE EXTENSION IF NOT EXISTS pg_partman SCHEMA partman;"
 
 # -- 3. Setup pg_repack

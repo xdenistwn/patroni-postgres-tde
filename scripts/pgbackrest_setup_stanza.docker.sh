@@ -4,7 +4,7 @@ set -e
 # This script helps initialize the pgBackRest stanza.
 # It should be run after the cluster is up and running.
 
-STANZA_NAME="postgres-patroni-tde"
+STANZA_NAME="postgres-archive-dev-cluster-1"
 
 # Define multiple Patroni endpoints for resilience
 PATRONI_ENDPOINTS=(

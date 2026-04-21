@@ -26,8 +26,8 @@ hsm:
       # AppRole credentials (role_id + secret_id) created in Vault for minkms-role.
       # Policy: transit encrypt/decrypt/hmac/sign/verify + keys read on minkms-sealing-key.
       approle:
-        id: "4ba35775-2ced-b4b2-c917-380c9ff8d315"
-        secret: "4a1c140a-bc85-8f00-9ff1-0c70d806a165"
+        id: "change_into_your_role_id"
+        secret: "change_into_your_secret_id"
       # Transit engine wraps the MinKMS root key.
       transit:
         engine: "transit"

@@ -22,10 +22,10 @@ services:
       - ./certs:/root/.minio/certs
       - ./license/minio.license:/minio.license
     environment:
-      - MINIO_KMS_SERVER=https://minkms:7373
-      - MINIO_KMS_API_KEY=k2:2c6M4bUgtPx2JiAj6rg3AUPR0NtEQ5Zo8ak-PT-NiZs
-      - MINIO_KMS_SSE_KEY=ggwp-key-1
-      - MINIO_KMS_ENCLAVE=postgres-archive-demo
+      - MINIO_KMS_SERVER=${MINIO_KMS_SERVER}
+      - MINIO_KMS_API_KEY=${MINIO_KMS_API_KEY}
+      - MINIO_KMS_SSE_KEY=${MINIO_KMS_SSE_KEY}
+      - MINIO_KMS_ENCLAVE=${MINIO_KMS_ENCLAVE}
       - TZ=Asia/Jakarta
     command: [ "server", "/mnt/data", "--license", "/minio.license" ]
     healthcheck:
