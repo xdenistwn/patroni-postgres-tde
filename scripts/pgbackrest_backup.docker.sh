@@ -6,7 +6,7 @@
 # =============================================================================
 set -e
 
-STANZA="postgres-patroni-tde"
+STANZA="postgres-archive-dev-cluster-1"
 BACKUP_TYPE="${1:-full}"  # full, diff, or incr
 
 # Define multiple Patroni endpoints for resilience

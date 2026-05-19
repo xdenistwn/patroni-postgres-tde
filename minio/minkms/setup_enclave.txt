@@ -1,6 +1,6 @@
 1. Download minkms tools via cli
 2. export MINIO_KMS_ENDPOINT=http://localhost:7373
-export MINIO_KMS_API_KEY=k1:VALUE
+export MINIO_KMS_API_KEY=k1:sGleLWEYtJsNRbkJz6L8A6lnf8Ov15fq_MK18-8FmnY
 minkms stat -k
 
 3. create enclave

@@ -33,6 +33,11 @@ This guide provides specialized instructions and workflows for managing the Patr
 - Extensions `pg_tde`, `pg_partman`, `pg_cron`, `pg_repack`, `pg_stat_monitor`, `pgAudit` are available.
 - See `postgres/*.sample.sql` for specific setup examples (e.g., `pg_partman_setup_encrypt.sample.sql`).
 
+### 6. Observability & Monitoring
+- Dedicated monitoring database user must be set up via: `docker exec -i postgres-one psql -U postgres < postgres/monitoring_setup.sql`
+- Run the metrics pipeline (Prometheus, Grafana, Exporters): `make up-monitoring`
+- Access pre-provisioned dashboards at Grafana: `http://localhost:3000` (admin/admin)
+
 ## Maintenance Commands
 
 | Task | Command / Script |
@@ -42,9 +47,14 @@ This guide provides specialized instructions and workflows for managing the Patr
 | Benchmark | `./scripts/pgbench_test.docker.sh` |
 | PGBouncer Ping | `./scripts/pgbouncer_ping_test.docker.sh` |
 | Patroni Status | `./scripts/patroni_cluster_status.sh` |
+| Monitoring Up | `make up-monitoring` |
+| Monitoring Down | `make down-monitoring` |
+| Monitoring Logs | `make logs-monitoring` |
 
 ## Troubleshooting
 - **Patroni Logs**: `docker logs postgres-one` or `docker logs postgres-two`.
 - **Vault Connectivity**: Verify `vault_token.txt` in the respective postgres directories.
 - **MinIO Access**: Ensure `pgbackrest-policy.json` is correctly applied.
 - **TLS Issues**: Check cert expiration and CA matching using `openssl x509 -text -noout -in <cert>`.
+- **Monitoring Status**: Verify targets are UP at `http://localhost:9090/targets` or run `make status-monitoring`.
+

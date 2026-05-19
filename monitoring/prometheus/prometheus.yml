@@ -1,0 +1,45 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Scraping postgres_exporter for PostgreSQL cluster metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter-one:9187']
+        labels:
+          instance: 'postgres-one'
+          cluster: 'patroni-tde'
+          role: 'master'
+      - targets: ['postgres-exporter-two:9187']
+        labels:
+          instance: 'postgres-two'
+          cluster: 'patroni-tde'
+          role: 'replica'
+
+  # Scraping pgbouncer_exporter for connection pool metrics
+  # NOTE: instance label here is set to the pgbouncer node name so
+  # the dashboard $pgbouncer_instance variable resolves correctly via
+  # label_values(pgbouncer_pools_cl_active, instance)
+  - job_name: 'pgbouncer'
+    static_configs:
+      - targets: ['pgbouncer-exporter-one:9127']
+        labels:
+          instance: 'postgres-one'
+          cluster: 'patroni-tde'
+      - targets: ['pgbouncer-exporter-two:9127']
+        labels:
+          instance: 'postgres-two'
+          cluster: 'patroni-tde'
+
+  # Scraping node_exporter for Host/OS system metrics of each Postgres node
+  - job_name: 'node'
+    static_configs:
+      - targets: ['postgres-one:9100']
+        labels:
+          instance: 'postgres-one'
+          cluster: 'patroni-tde'
+      - targets: ['postgres-two:9100']
+        labels:
+          instance: 'postgres-two'
+          cluster: 'patroni-tde'

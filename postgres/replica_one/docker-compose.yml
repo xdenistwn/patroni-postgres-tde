@@ -31,6 +31,7 @@ services:
       - "5433:5432"
       - "6433:6432"
       - "8009:8008"
+      - "9101:9100"
     networks:
       - sg-prod-zone-1
     volumes:
@@ -45,6 +46,23 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # Node Exporter for postgres-two node (sharing its network namespace)
+  node-exporter-two:
+    image: prom/node-exporter:v1.6.0
+    container_name: node-exporter-two
+    network_mode: "service:postgres-two"
+    pid: "host"
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro,rslave
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
 
 networks:
   sg-prod-zone-1:

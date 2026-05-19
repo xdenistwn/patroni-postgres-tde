@@ -7,7 +7,7 @@ DB_NAME="postgres"
 DB_USER=${PATRONI_PG_SUPERUSER:-"postgres"}
 export PGPASSWORD=${PATRONI_PG_PASSWORD:-"postgres_password_secure"}
 
-VAULT_PROVIDER_NAME="vault"
+VAULT_PROVIDER_NAME="vault-provider"
 NEW_KEY_NAME="master-global-key-$(date +%s)"
 
 # Define multiple Patroni endpoints for resilience

@@ -131,3 +131,24 @@ restart-haproxy-standby:
 	docker compose -f haproxy/standby/docker-compose.yml restart;
 logs-haproxy-standby:
 	docker compose -f haproxy/standby/docker-compose.yml logs -f;
+
+.PHONY: up-monitoring down-monitoring logs-monitoring status-monitoring
+
+up-monitoring:
+	docker compose -f monitoring/docker-compose.yml up -d
+
+down-monitoring:
+	docker compose -f monitoring/docker-compose.yml down
+
+remove-monitoring:
+	docker volume rm monitoring_grafana_data
+	docker volume rm monitoring_prometheus_data
+
+stop-monitoring:
+	docker compose -f monitoring/docker-compose.yml stop
+
+logs-monitoring:
+	docker compose -f monitoring/docker-compose.yml logs -f
+
+status-monitoring:
+	docker compose -f monitoring/docker-compose.yml ps

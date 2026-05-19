@@ -1,0 +1,106 @@
+services:
+  # Prometheus Server
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - sg-prod-zone-1
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+
+  # Grafana Server
+  grafana:
+    image: grafana/grafana-oss:10.0.0
+    container_name: grafana
+    hostname: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin # Default password for development
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    networks:
+      - sg-prod-zone-1
+    depends_on:
+      - prometheus
+
+
+  # PostgreSQL Exporter for postgres-one (Master)
+  postgres-exporter-one:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter-one
+    hostname: postgres-exporter-one
+    restart: unless-stopped
+    ports:
+      - "9187:9187"
+    environment:
+      - DATA_SOURCE_NAME=${POSTGRES_EXPORTER_ONE_DSN}
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    volumes:
+      - ./postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    networks:
+      - sg-prod-zone-1
+
+  # PostgreSQL Exporter for postgres-two (Replica)
+  postgres-exporter-two:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: postgres-exporter-two
+    hostname: postgres-exporter-two
+    restart: unless-stopped
+    ports:
+      - "9188:9187"
+    environment:
+      - DATA_SOURCE_NAME=${POSTGRES_EXPORTER_TWO_DSN}
+      - PG_EXPORTER_EXTEND_QUERY_PATH=/etc/postgres_exporter/queries.yaml
+    volumes:
+      - ./postgres_exporter/queries.yaml:/etc/postgres_exporter/queries.yaml:ro
+    networks:
+      - sg-prod-zone-1
+
+  # PgBouncer Exporter for postgres-one (Master)
+  pgbouncer-exporter-one:
+    image: prometheuscommunity/pgbouncer-exporter:v0.6.0
+    container_name: pgbouncer-exporter-one
+    hostname: pgbouncer-exporter-one
+    restart: unless-stopped
+    ports:
+      - "9127:9127"
+    command:
+      - --pgBouncer.connectionString=${PGBOUNCER_EXPORTER_ONE_DSN}
+    networks:
+      - sg-prod-zone-1
+
+  # PgBouncer Exporter for postgres-two (Replica)
+  pgbouncer-exporter-two:
+    image: prometheuscommunity/pgbouncer-exporter:v0.6.0
+    container_name: pgbouncer-exporter-two
+    hostname: pgbouncer-exporter-two
+    restart: unless-stopped
+    ports:
+      - "9128:9127"
+    command:
+      - --pgBouncer.connectionString=${PGBOUNCER_EXPORTER_TWO_DSN}
+    networks:
+      - sg-prod-zone-1
+
+networks:
+  sg-prod-zone-1:
+    external: true
+
+volumes:
+  prometheus_data:
+  grafana_data:

@@ -1,1 +1,2 @@
 "postgres" "md595facdde00e469cf9cf616c156a2b588"
+"monitor_user" "md5f1828cd1bce452833ac1363a8aea01cf"

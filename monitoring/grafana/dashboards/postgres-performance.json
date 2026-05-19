@@ -1,0 +1,246 @@
+{
+  "annotations": {"list":[{"builtIn":1,"datasource":{"type":"datasource","uid":"grafana"},"enable":true,"hide":true,"name":"Annotations & Alerts","type":"dashboard"}]},
+  "editable": true, "fiscalYearStartMonth": 0, "graphTooltip": 1, "id": null, "links": [], "liveNow": false,
+  "panels": [
+    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":0},"id":200,"title":"Query Performance (pg_stat_monitor)","type":"row"},
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},
+      "description":"Slowest queries by cumulative total execution time. 'Total Time' = sum of all calls. 'Avg Time' = mean per single call. Sort any column header to re-rank. Refreshes every 30s.",
+      "fieldConfig":{
+        "defaults":{"color":{"mode":"thresholds"},"custom":{"align":"left","displayMode":"auto","filterable":true,"minWidth":80},"mappings":[],"thresholds":{"mode":"absolute","steps":[{"color":"blue","value":null}]}},
+        "overrides":[
+          {"matcher":{"id":"byName","options":"Total Time (ms)"},"properties":[{"id":"unit","value":"ms"},{"id":"custom.width","value":150},{"id":"custom.displayMode","value":"color-background-solid"},{"id":"thresholds","value":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":60000},{"color":"red","value":300000}]}}]},
+          {"matcher":{"id":"byName","options":"Avg Time (ms)"},"properties":[{"id":"custom.width","value":130}]},
+          {"matcher":{"id":"byName","options":"Calls"},"properties":[{"id":"custom.width","value":80}]},
+          {"matcher":{"id":"byName","options":"Database"},"properties":[{"id":"custom.width","value":110}]},
+          {"matcher":{"id":"byName","options":"User"},"properties":[{"id":"custom.width","value":110}]},
+          {"matcher":{"id":"byName","options":"Query"},"properties":[{"id":"custom.inspect","value":true}]}
+        ]
+      },
+      "gridPos":{"h":14,"w":24,"x":0,"y":1},"id":7,
+      "options":{"cellHeight":"sm","footer":{"show":false},"showHeader":true,"enablePagination":true,"sortBy":[{"displayName":"Total Time (ms)","desc":true}]},
+      "targets":[
+        {
+          "datasource":{"type":"prometheus","uid":"Prometheus"},
+          "editorMode":"code",
+          "expr":"topk(50, pg_stat_monitor_summary_total_exec_time_ms{instance=\"$instance\", datname=~\"$datname\"})",
+          "format":"table",
+          "instant":true,
+          "range":false,
+          "refId":"A"
+        }
+      ],
+      "transformations":[
+        {
+          "id":"organize",
+          "options":{
+            "excludeByName":{"Time":true,"instance":true,"job":true,"__name__":true},
+            "indexByName":{"datname":0,"username":1,"query":2,"Value":3,"avg_time_ms":4,"call_count":5},
+            "renameByName":{
+              "datname":"Database",
+              "username":"User",
+              "query":"Query",
+              "Value":"Total Time (ms)",
+              "avg_time_ms":"Avg Time (ms)",
+              "call_count":"Calls"
+            }
+          }
+        },
+        {"id":"sortBy","options":{"fields":[{"displayName":"Total Time (ms)","desc":true}]}}
+      ],
+      "title":"Top 50 Queries by Total Execution Time (paginated)","type":"table"
+    },
+
+
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},
+      "description":"Queries CURRENTLY RUNNING right now — each row is one active backend. Value = how long it has been running (seconds). Updates every 30s. Requires pg_stat_activity_running metric from queries.yaml.",
+      "fieldConfig":{
+        "defaults":{"color":{"mode":"thresholds"},"custom":{"align":"left","displayMode":"auto","filterable":true,"minWidth":80},"mappings":[],"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":5},{"color":"red","value":30}]}},
+        "overrides":[
+          {"matcher":{"id":"byName","options":"Running (s)"},"properties":[{"id":"unit","value":"s"},{"id":"custom.width","value":120},{"id":"custom.displayMode","value":"color-background-solid"}]},
+          {"matcher":{"id":"byName","options":"Database"},"properties":[{"id":"custom.width","value":110}]},
+          {"matcher":{"id":"byName","options":"User"},"properties":[{"id":"custom.width","value":110}]},
+          {"matcher":{"id":"byName","options":"Wait Event"},"properties":[{"id":"custom.width","value":120}]},
+          {"matcher":{"id":"byName","options":"Query"},"properties":[{"id":"custom.inspect","value":true}]}
+        ]
+      },
+      "gridPos":{"h":8,"w":24,"x":0,"y":16},"id":30,
+      "options":{"cellHeight":"sm","footer":{"show":false},"showHeader":true,"enablePagination":true,"sortBy":[{"displayName":"Running (s)","desc":true}]},
+      "targets":[
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"pg_stat_activity_running_query_duration_seconds{instance=\"$instance\", datname=~\"$datname\"}","format":"table","instant":true,"range":false,"refId":"A"}
+      ],
+      "transformations":[
+        {"id":"organize","options":{
+          "excludeByName":{"Time":true,"instance":true,"job":true,"state":true,"__name__":true},
+          "indexByName":{"datname":0,"username":1,"query":2,"Value":3,"wait_event_type":4,"wait_event":5},
+          "renameByName":{
+            "datname":"Database","username":"User","query":"Query",
+            "Value":"Running (s)","wait_event_type":"Wait Type","wait_event":"Wait Event"
+          }
+        }},
+        {"id":"sortBy","options":{"fields":[{"displayName":"Running (s)","desc":true}]}}
+      ],
+      "title":"Currently Active Queries (Real-time)","type":"table"
+    },
+
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Query calls per second.",
+      "fieldConfig":{"defaults":{"color":{"mode":"palette-classic"},"custom":{"drawStyle":"line","fillOpacity":10,"lineWidth":2},"mappings":[],"unit":"ops"},"overrides":[]},
+      "gridPos":{"h":7,"w":12,"x":0,"y":10},"id":8,
+      "options":{"legend":{"calcs":["mean","max","lastNotNull"],"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(rate(pg_stat_monitor_calls{instance=\"$instance\", datname=~\"$datname\"}[$__rate_interval]))","legendFormat":"Queries/sec","range":true,"refId":"A"}],
+      "title":"Query Calls per Second","type":"timeseries"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Average query execution latency in ms.",
+      "fieldConfig":{"defaults":{"color":{"mode":"palette-classic"},"custom":{"drawStyle":"line","fillOpacity":10,"lineWidth":2},"mappings":[],"unit":"ms"},"overrides":[]},
+      "gridPos":{"h":7,"w":12,"x":12,"y":10},"id":9,
+      "options":{"legend":{"calcs":["mean","max","lastNotNull"],"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi"}},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"avg(pg_stat_monitor_mean_time{instance=\"$instance\", datname=~\"$datname\"})","legendFormat":"Avg Latency (ms)","range":true,"refId":"A"}],
+      "title":"Average Query Latency","type":"timeseries"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Overall block cache hit ratio. Above 95% is healthy.",
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"mappings":[],"thresholds":{"mode":"absolute","steps":[{"color":"red","value":null},{"color":"yellow","value":0.85},{"color":"green","value":0.95}]},"unit":"percentunit","min":0,"max":1},"overrides":[]},
+      "gridPos":{"h":4,"w":6,"x":0,"y":17},"id":11,
+      "options":{"colorMode":"background","graphMode":"area","justifyMode":"center","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"value"},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pg_stat_monitor_shared_blks_hit{instance=\"$instance\", datname=~\"$datname\"}) / (sum(pg_stat_monitor_shared_blks_hit{instance=\"$instance\", datname=~\"$datname\"}) + sum(pg_stat_monitor_shared_blks_read{instance=\"$instance\", datname=~\"$datname\"}) + 1)","instant":true,"range":false,"legendFormat":"Cache Hit Ratio","refId":"A"}],
+      "title":"Overall Cache Hit Ratio","type":"stat"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Top 10 queries by mean execution time.",
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"mappings":[],"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":100},{"color":"red","value":500}]},"unit":"ms"},"overrides":[]},
+      "gridPos":{"h":4,"w":18,"x":6,"y":17},"id":10,
+      "options":{"displayMode":"gradient","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"showUnfilled":true},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"topk(10, sum by (query) (pg_stat_monitor_mean_time{instance=\"$instance\", datname=~\"$datname\"}))","legendFormat":"{{query}}","instant":true,"range":false,"refId":"A"}],
+      "title":"Top 10 Queries by Mean Execution Time","type":"bargauge"
+    },
+    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":22},"id":400,"title":"Background Writer & Checkpoints","type":"row"},
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Checkpoint frequency: timed (scheduled) vs requested (WAL pressure).",
+      "fieldConfig":{"defaults":{"color":{"mode":"palette-classic"},"custom":{"drawStyle":"line","fillOpacity":10,"lineWidth":2},"mappings":[],"unit":"cps"},"overrides":[{"matcher":{"id":"byName","options":"Timed"},"properties":[{"id":"color","value":{"fixedColor":"green","mode":"fixed"}}]},{"matcher":{"id":"byName","options":"Requested"},"properties":[{"id":"color","value":{"fixedColor":"orange","mode":"fixed"}}]}]},
+      "gridPos":{"h":7,"w":12,"x":0,"y":23},"id":18,
+      "options":{"legend":{"calcs":["sum","max"],"displayMode":"list","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi"}},
+      "targets":[
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"rate(pg_stat_bgwriter_checkpoints_timed{instance=\"$instance\"}[$__rate_interval])","legendFormat":"Timed","range":true,"refId":"A"},
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"rate(pg_stat_bgwriter_checkpoints_req{instance=\"$instance\"}[$__rate_interval])","legendFormat":"Requested","range":true,"refId":"B"}
+      ],
+      "title":"Checkpoint Frequency (Timed vs Requested)","type":"timeseries"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Buffers written by checkpoint, bgwriter, and backends per second.",
+      "fieldConfig":{"defaults":{"color":{"mode":"palette-classic"},"custom":{"drawStyle":"line","fillOpacity":10,"lineWidth":2},"mappings":[],"unit":"ops"},"overrides":[]},
+      "gridPos":{"h":7,"w":12,"x":12,"y":23},"id":19,
+      "options":{"legend":{"calcs":["mean","max"],"displayMode":"table","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},
+      "targets":[
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"rate(pg_stat_bgwriter_buffers_checkpoint{instance=\"$instance\"}[$__rate_interval])","legendFormat":"Checkpoint Writes","range":true,"refId":"A"},
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"rate(pg_stat_bgwriter_buffers_clean{instance=\"$instance\"}[$__rate_interval])","legendFormat":"Clean Writes","range":true,"refId":"B"},
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"rate(pg_stat_bgwriter_buffers_backend{instance=\"$instance\"}[$__rate_interval])","legendFormat":"Backend Writes","range":true,"refId":"C"}
+      ],
+      "title":"Buffers Written (Checkpoint / Clean / Backend)","type":"timeseries"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"% of checkpoints that were requested (WAL pressure). Ideally below 10%.",
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"mappings":[],"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"yellow","value":10},{"color":"red","value":25}]},"unit":"percent","min":0,"max":100},"overrides":[]},
+      "gridPos":{"h":3,"w":24,"x":0,"y":30},"id":20,
+      "options":{"colorMode":"background","graphMode":"area","justifyMode":"center","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"value"},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"rate(pg_stat_bgwriter_checkpoints_req{instance=\"$instance\"}[$__rate_interval]) / (rate(pg_stat_bgwriter_checkpoints_req{instance=\"$instance\"}[$__rate_interval]) + rate(pg_stat_bgwriter_checkpoints_timed{instance=\"$instance\"}[$__rate_interval]) + 0.001) * 100","instant":true,"range":false,"legendFormat":"Requested %","refId":"A"}],
+      "title":"Checkpoint Write Ratio (Requested %)","type":"stat"
+    },
+    {"collapsed":false,"gridPos":{"h":1,"w":24,"x":0,"y":34},"id":600,"title":"PgBouncer Connection Pool","type":"row"},
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Active client connections in PgBouncer (sum across all pools).",
+      "fieldConfig":{"defaults":{"color":{"mode":"fixed","fixedColor":"green"},"mappings":[],"unit":"short"},"overrides":[]},
+      "gridPos":{"h":4,"w":6,"x":0,"y":35},"id":24,
+      "options":{"colorMode":"value","graphMode":"none","justifyMode":"center","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"value"},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pgbouncer_pools_client_active_connections{instance=\"$pgbouncer_instance\"})","instant":true,"range":false,"legendFormat":"Active Clients","refId":"A"}],
+      "title":"Active Clients (PgBouncer)","type":"stat"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Clients waiting for a server connection. Any value > 0 means the pool is saturated.",
+      "fieldConfig":{"defaults":{"color":{"mode":"thresholds"},"mappings":[],"thresholds":{"mode":"absolute","steps":[{"color":"green","value":null},{"color":"red","value":1}]},"unit":"short"},"overrides":[]},
+      "gridPos":{"h":4,"w":6,"x":6,"y":35},"id":25,
+      "options":{"colorMode":"background","graphMode":"none","justifyMode":"center","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"value"},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pgbouncer_pools_client_waiting_connections{instance=\"$pgbouncer_instance\"})","instant":true,"range":false,"legendFormat":"Waiting","refId":"A"}],
+      "title":"Waiting Clients (PgBouncer)","type":"stat"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Active backend server connections held by PgBouncer.",
+      "fieldConfig":{"defaults":{"color":{"mode":"fixed","fixedColor":"blue"},"mappings":[],"unit":"short"},"overrides":[]},
+      "gridPos":{"h":4,"w":6,"x":12,"y":35},"id":26,
+      "options":{"colorMode":"value","graphMode":"none","justifyMode":"center","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"value"},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pgbouncer_pools_server_active_connections{instance=\"$pgbouncer_instance\"})","instant":true,"range":false,"legendFormat":"Server Active","refId":"A"}],
+      "title":"Active Server Conns (PgBouncer)","type":"stat"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Idle server connections held open by PgBouncer for reuse.",
+      "fieldConfig":{"defaults":{"color":{"mode":"fixed","fixedColor":"purple"},"mappings":[],"unit":"short"},"overrides":[]},
+      "gridPos":{"h":4,"w":6,"x":18,"y":35},"id":27,
+      "options":{"colorMode":"value","graphMode":"none","justifyMode":"center","orientation":"horizontal","reduceOptions":{"calcs":["lastNotNull"],"fields":"","values":false},"textMode":"value"},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pgbouncer_pools_server_idle_connections{instance=\"$pgbouncer_instance\"})","instant":true,"range":false,"legendFormat":"Server Idle","refId":"A"}],
+      "title":"Idle Server Conns (PgBouncer)","type":"stat"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Active vs waiting client connections over time.",
+      "fieldConfig":{"defaults":{"color":{"mode":"palette-classic"},"custom":{"drawStyle":"line","fillOpacity":10,"lineWidth":2},"mappings":[],"unit":"short"},"overrides":[{"matcher":{"id":"byName","options":"Active Clients"},"properties":[{"id":"color","value":{"fixedColor":"green","mode":"fixed"}}]},{"matcher":{"id":"byName","options":"Waiting Clients"},"properties":[{"id":"color","value":{"fixedColor":"red","mode":"fixed"}}]}]},
+      "gridPos":{"h":7,"w":12,"x":0,"y":39},"id":28,
+      "options":{"legend":{"calcs":["max","lastNotNull"],"displayMode":"list","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi","sort":"desc"}},
+      "targets":[
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pgbouncer_pools_client_active_connections{instance=\"$pgbouncer_instance\"})","legendFormat":"Active Clients","range":true,"refId":"A"},
+        {"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(pgbouncer_pools_client_waiting_connections{instance=\"$pgbouncer_instance\"})","legendFormat":"Waiting Clients","range":true,"refId":"B"}
+      ],
+      "title":"Client Connections over Time (PgBouncer)","type":"timeseries"
+    },
+    {
+      "datasource":{"type":"prometheus","uid":"Prometheus"},"description":"Total queries pooled per second by PgBouncer.",
+      "fieldConfig":{"defaults":{"color":{"mode":"palette-classic"},"custom":{"drawStyle":"line","fillOpacity":10,"lineWidth":2},"mappings":[],"unit":"ops"},"overrides":[]},
+      "gridPos":{"h":7,"w":12,"x":12,"y":39},"id":29,
+      "options":{"legend":{"calcs":["mean","max","lastNotNull"],"displayMode":"list","placement":"bottom","showLegend":true},"tooltip":{"mode":"multi"}},
+      "targets":[{"datasource":{"type":"prometheus","uid":"Prometheus"},"editorMode":"code","expr":"sum(rate(pgbouncer_stats_queries_pooled_total{instance=\"$pgbouncer_instance\"}[$__rate_interval]))","legendFormat":"Queries/sec","range":true,"refId":"A"}],
+      "title":"PgBouncer Query Throughput","type":"timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["postgresql","pgbouncer","prometheus"],
+  "templating": {
+    "list": [
+      {
+        "current":{},"datasource":{"type":"prometheus","uid":"Prometheus"},
+        "definition":"label_values(pg_up, cluster)",
+        "hide":0,"includeAll":false,"label":"Cluster","multi":false,"name":"cluster","options":[],
+        "query":{"query":"label_values(pg_up, cluster)","refId":"StandardVariableQuery"},
+        "refresh":2,"regex":"","skipUrlSync":false,"sort":1,"type":"query"
+      },
+      {
+        "current":{},"datasource":{"type":"prometheus","uid":"Prometheus"},
+        "definition":"label_values(pg_up{cluster=\"$cluster\"}, instance)",
+        "hide":0,"includeAll":false,"label":"PostgreSQL Instance","multi":false,"name":"instance","options":[],
+        "query":{"query":"label_values(pg_up{cluster=\"$cluster\"}, instance)","refId":"StandardVariableQuery"},
+        "refresh":2,"regex":"","skipUrlSync":false,"sort":1,"type":"query"
+      },
+      {
+        "current":{},"datasource":{"type":"prometheus","uid":"Prometheus"},
+        "definition":"label_values(pg_stat_database_numbackends{instance=\"$instance\", datname!~\"template.*|postgres\"}, datname)",
+        "hide":0,"includeAll":true,"allValue":".*","label":"Database","multi":true,"name":"datname","options":[],
+        "query":{"query":"label_values(pg_stat_database_numbackends{instance=\"$instance\", datname!~\"template.*|postgres\"}, datname)","refId":"StandardVariableQuery"},
+        "refresh":2,"regex":"","skipUrlSync":false,"sort":1,"type":"query"
+      },
+      {
+        "current":{},"datasource":{"type":"prometheus","uid":"Prometheus"},
+        "definition":"label_values(pgbouncer_pools_client_active_connections{cluster=\"$cluster\"}, instance)",
+        "hide":0,"includeAll":false,"label":"PgBouncer Instance","multi":false,"name":"pgbouncer_instance","options":[],
+        "query":{"query":"label_values(pgbouncer_pools_client_active_connections{cluster=\"$cluster\"}, instance)","refId":"StandardVariableQuery"},
+        "refresh":2,"regex":"","skipUrlSync":false,"sort":1,"type":"query"
+      }
+    ]
+  },
+  "time":{"from":"now-1h","to":"now"},
+  "timepicker":{"refresh_intervals":["10s","30s","1m","5m","15m","1h","2h","1d"]},
+  "timezone":"browser",
+  "title":"PostgreSQL Performance & Components Dashboard",
+  "uid":"postgres_performance",
+  "version":3
+}

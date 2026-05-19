@@ -1,0 +1,147 @@
+# postgres_exporter custom queries for pg_stat_monitor extension
+
+pg_stat_monitor:
+  query: >
+    SELECT 
+      COALESCE(d.datname, 'unknown') as datname,
+      COALESCE(r.rolname, 'unknown') as user,
+      SUBSTRING(m.query, 1, 200) as query,
+      SUM(m.calls) as calls,
+      SUM(m.total_exec_time) as total_time,
+      AVG(m.mean_exec_time) as mean_time,
+      SUM(m.rows) as rows,
+      SUM(m.shared_blks_hit) as shared_blks_hit,
+      SUM(m.shared_blks_read) as shared_blks_read
+    FROM pg_stat_monitor m
+    LEFT JOIN pg_database d ON m.dbid = d.oid
+    LEFT JOIN pg_roles r ON m.userid = r.oid
+    WHERE m.query IS NOT NULL
+    GROUP BY 
+      COALESCE(d.datname, 'unknown'),
+      COALESCE(r.rolname, 'unknown'),
+      SUBSTRING(m.query, 1, 200)
+    ORDER BY total_time DESC
+    LIMIT 100
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Name of the database"
+    - user:
+        usage: "LABEL"
+        description: "PostgreSQL user who executed the query"
+    - query:
+        usage: "LABEL"
+        description: "Normalized query text (truncated to 200 chars)"
+    - calls:
+        usage: "COUNTER"
+        description: "Total number of times the query has been executed"
+    - total_time:
+        usage: "COUNTER"
+        description: "Total execution time of the query in milliseconds"
+    - mean_time:
+        usage: "GAUGE"
+        description: "Mean execution time of the query in milliseconds"
+    - rows:
+        usage: "COUNTER"
+        description: "Total number of rows retrieved or affected by the query"
+    - shared_blks_hit:
+        usage: "COUNTER"
+        description: "Total shared block cache hits for this query"
+    - shared_blks_read:
+        usage: "COUNTER"
+        description: "Total shared block cache misses (reads) for this query"
+
+# pg_postmaster_start_time_seconds — removed from postgres_exporter v0.15.0 built-ins.
+# Re-adds it via custom query so the Uptime panel (time() - pg_postmaster_start_time_seconds)
+# works correctly in the cluster dashboard.
+pg_postmaster:
+  query: >
+    SELECT EXTRACT(EPOCH FROM pg_postmaster_start_time())::float AS start_time_seconds
+  metrics:
+    - start_time_seconds:
+        usage: "GAUGE"
+        description: "Unix timestamp of when the PostgreSQL postmaster last started"
+
+# Single combined summary metric for Grafana table display.
+# mean_time and calls are exposed as string LABELS so a single Prometheus
+# query returns all 6 needed columns without any cross-metric join.
+# This powers the "Top 50 Queries" table in the performance dashboard.
+pg_stat_monitor_summary:
+  query: >
+    SELECT
+      COALESCE(d.datname, 'unknown')                          AS datname,
+      COALESCE(r.rolname, 'unknown')                          AS username,
+      SUBSTRING(m.query, 1, 200)                              AS query,
+      ROUND(AVG(m.mean_exec_time)::numeric, 2)::text          AS avg_time_ms,
+      SUM(m.calls)::text                                      AS call_count,
+      SUM(m.total_exec_time)                                  AS total_exec_time_ms
+    FROM pg_stat_monitor m
+    LEFT JOIN pg_database d ON m.dbid = d.oid
+    LEFT JOIN pg_roles r ON m.userid = r.oid
+    WHERE m.query IS NOT NULL
+    GROUP BY
+      COALESCE(d.datname, 'unknown'),
+      COALESCE(r.rolname, 'unknown'),
+      SUBSTRING(m.query, 1, 200)
+    ORDER BY total_exec_time_ms DESC
+    LIMIT 50
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - username:
+        usage: "LABEL"
+        description: "PostgreSQL user"
+    - query:
+        usage: "LABEL"
+        description: "Query text (truncated to 200 chars)"
+    - avg_time_ms:
+        usage: "LABEL"
+        description: "Average execution time in ms (as string label for single-query display)"
+    - call_count:
+        usage: "LABEL"
+        description: "Total number of calls (as string label for single-query display)"
+    - total_exec_time_ms:
+        usage: "GAUGE"
+        description: "Total execution time in milliseconds (metric value)"
+
+
+# Currently active queries from pg_stat_activity.
+# Each row is a RUNNING query right now — value is how long it has been running (seconds).
+# This powers the "Currently Active Queries" Grafana panel.
+pg_stat_activity_running:
+  query: >
+    SELECT
+      a.datname,
+      a.usename                                               AS username,
+      a.state,
+      COALESCE(a.wait_event_type, 'none')                    AS wait_event_type,
+      COALESCE(a.wait_event, 'none')                         AS wait_event,
+      SUBSTRING(a.query, 1, 200)                             AS query,
+      EXTRACT(EPOCH FROM (now() - a.query_start))::float     AS query_duration_seconds
+    FROM pg_stat_activity a
+    WHERE a.state = 'active'
+      AND a.query NOT LIKE '%pg_stat_activity%'
+      AND a.pid <> pg_backend_pid()
+  metrics:
+    - datname:
+        usage: "LABEL"
+        description: "Database name"
+    - username:
+        usage: "LABEL"
+        description: "PostgreSQL user running the query"
+    - state:
+        usage: "LABEL"
+        description: "Connection state (active)"
+    - wait_event_type:
+        usage: "LABEL"
+        description: "Type of wait event (Lock, IO, Client, none)"
+    - wait_event:
+        usage: "LABEL"
+        description: "Specific wait event name"
+    - query:
+        usage: "LABEL"
+        description: "Currently executing query text (truncated to 200 chars)"
+    - query_duration_seconds:
+        usage: "GAUGE"
+        description: "How long this query has been running in seconds"
